@@ -59,26 +59,18 @@ export function useGameState() {
     const handleKeyPress = (event: KeyboardEvent) => {
       switch (event.key) {
         case 'ArrowUp':
-        case 'w':
-        case 'W':
           event.preventDefault();
           movePlayer('up');
           break;
         case 'ArrowDown':
-        case 's':
-        case 'S':
           event.preventDefault();
           movePlayer('down');
           break;
         case 'ArrowLeft':
-        case 'a':
-        case 'A':
           event.preventDefault();
           movePlayer('left');
           break;
         case 'ArrowRight':
-        case 'd':
-        case 'D':
           event.preventDefault();
           movePlayer('right');
           break;
