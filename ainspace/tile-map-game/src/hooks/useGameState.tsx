@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useMapData } from '@/providers/MapDataProvider';
+import { useSession } from '@/hooks/useSession';
+import { useAgents } from '@/hooks/useAgents';
 
 interface Position {
   x: number;
@@ -13,9 +15,11 @@ const MAP_HEIGHT = 12;
 
 export function useGameState() {
   const { getMapData, generateTileAt } = useMapData();
+  const { userId } = useSession();
   
   // Character starts at world position (0, 0), which will be center of the map
   const [worldPosition, setWorldPosition] = useState<Position>({ x: 0, y: 0 });
+  const [isLoading, setIsLoading] = useState(true);
   
   // Get the current map data centered on the player's world position
   const mapData = getMapData(worldPosition.x, worldPosition.y, MAP_WIDTH, MAP_HEIGHT);
@@ -25,6 +29,32 @@ export function useGameState() {
     x: Math.floor(MAP_WIDTH / 2), 
     y: Math.floor(MAP_HEIGHT / 2) 
   };
+
+  // Initialize agents system
+  const { agents, visibleAgents } = useAgents({
+    playerWorldPosition: worldPosition,
+    mapWidth: MAP_WIDTH,
+    mapHeight: MAP_HEIGHT
+  });
+
+  const savePositionToRedis = useCallback(async (position: Position) => {
+    if (!userId) return;
+    
+    try {
+      await fetch('/api/position', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          position
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to save position:', error);
+    }
+  }, [userId]);
 
   const movePlayer = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     setWorldPosition(prevWorldPos => {
@@ -51,12 +81,40 @@ export function useGameState() {
         return prevWorldPos;
       }
 
+      // Save new position to Redis
+      savePositionToRedis(newWorldPosition);
+
       return newWorldPosition;
     });
-  }, [generateTileAt]);
+  }, [generateTileAt, savePositionToRedis]);
+
+  // Load saved position from Redis when user session is available
+  useEffect(() => {
+    const loadSavedPosition = async () => {
+      if (!userId) return;
+      
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/position?userId=${userId}`);
+        const data = await response.json();
+        
+        if (response.ok && !data.isDefault) {
+          setWorldPosition(data.position);
+        }
+      } catch (error) {
+        console.error('Failed to load saved position:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSavedPosition();
+  }, [userId]);
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
+      if (isLoading) return; // Don't allow movement while loading
+      
       switch (event.key) {
         case 'ArrowUp':
           event.preventDefault();
@@ -79,12 +137,16 @@ export function useGameState() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [movePlayer]);
+  }, [movePlayer, isLoading]);
 
   return {
     playerPosition,
     mapData,
     worldPosition,
-    movePlayer
+    movePlayer,
+    isLoading,
+    userId,
+    agents,
+    visibleAgents
   };
 }

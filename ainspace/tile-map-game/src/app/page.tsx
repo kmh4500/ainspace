@@ -5,7 +5,7 @@ import ChatBox from '@/components/ChatBox';
 import { useGameState } from '@/hooks/useGameState';
 
 export default function Home() {
-  const { playerPosition, mapData, worldPosition } = useGameState();
+  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents } = useGameState();
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -23,6 +23,7 @@ export default function Home() {
                   mapData={mapData}
                   tileSize={40}
                   playerPosition={playerPosition}
+                  agents={visibleAgents}
                 />
               </div>
               
@@ -33,6 +34,39 @@ export default function Home() {
                 <p className="text-gray-500 text-sm">
                   Screen Position: ({playerPosition.x}, {playerPosition.y})
                 </p>
+                {userId && (
+                  <p className="text-gray-400 text-xs">
+                    User ID: {userId.slice(0, 8)}... {isLoading ? '(Loading...)' : '(Saved)'}
+                  </p>
+                )}
+                
+                {/* Agent Positions */}
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Agent Positions</h4>
+                  <div className="space-y-1 text-xs">
+                    {agents.map((agent) => (
+                      <div key={agent.id} className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <div 
+                            className="w-3 h-3 mr-2 rounded-sm border border-gray-400"
+                            style={{ backgroundColor: agent.color }}
+                          ></div>
+                          <span className="text-gray-700">{agent.name}</span>
+                        </div>
+                        <div className="text-gray-500">
+                          ({agent.x}, {agent.y})
+                          {visibleAgents.some(va => va.id === agent.id) && 
+                            <span className="ml-1 text-green-600">●</span>
+                          }
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500 flex items-center">
+                    <span className="text-green-600 mr-1">●</span>
+                    <span>Visible on map</span>
+                  </div>
+                </div>
                 <div className="text-sm text-gray-500">
                   <p>Use arrow keys to move</p>
                   <div className="flex justify-center mt-4 space-x-4">
@@ -55,6 +89,20 @@ export default function Home() {
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-red-500 mr-2"></div>
                       <span>Player</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-center mt-2 space-x-4 text-xs">
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-green-500 mr-1"></div>
+                      <span>Agent</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-orange-500 mr-1"></div>
+                      <span>Agent</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-purple-500 mr-1"></div>
+                      <span>Agent</span>
                     </div>
                   </div>
                 </div>

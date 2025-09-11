@@ -2,13 +2,22 @@
 
 import { useEffect, useRef } from 'react';
 
+interface Agent {
+  id: string;
+  screenX: number;
+  screenY: number;
+  color: string;
+  name: string;
+}
+
 interface TileMapProps {
   mapData: number[][];
   tileSize: number;
   playerPosition: { x: number; y: number };
+  agents?: Agent[];
 }
 
-export default function TileMap({ mapData, tileSize, playerPosition }: TileMapProps) {
+export default function TileMap({ mapData, tileSize, playerPosition, agents = [] }: TileMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -52,7 +61,28 @@ export default function TileMap({ mapData, tileSize, playerPosition }: TileMapPr
       }
     }
 
-    // Draw player
+    // Draw agents
+    agents.forEach(agent => {
+      ctx.fillStyle = agent.color;
+      ctx.fillRect(
+        agent.screenX * tileSize + 4,
+        agent.screenY * tileSize + 4,
+        tileSize - 8,
+        tileSize - 8
+      );
+      
+      // Draw agent border
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        agent.screenX * tileSize + 4,
+        agent.screenY * tileSize + 4,
+        tileSize - 8,
+        tileSize - 8
+      );
+    });
+
+    // Draw player (on top of agents)
     ctx.fillStyle = '#FF0000'; // Red for player
     ctx.fillRect(
       playerPosition.x * tileSize + 2,
@@ -60,8 +90,18 @@ export default function TileMap({ mapData, tileSize, playerPosition }: TileMapPr
       tileSize - 4,
       tileSize - 4
     );
+    
+    // Draw player border
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+      playerPosition.x * tileSize + 2,
+      playerPosition.y * tileSize + 2,
+      tileSize - 4,
+      tileSize - 4
+    );
 
-  }, [mapData, tileSize, playerPosition]);
+  }, [mapData, tileSize, playerPosition, agents]);
 
   return (
     <canvas
