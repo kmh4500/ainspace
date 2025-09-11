@@ -9,6 +9,7 @@ interface Position {
 
 interface MapDataContextType {
   getMapData: (centerX: number, centerY: number, width: number, height: number) => number[][];
+  getCircularMapData: (centerX: number, centerY: number, radius: number, width: number, height: number) => number[][];
   generateTileAt: (x: number, y: number) => number;
 }
 
@@ -90,8 +91,39 @@ export function MapDataProvider({ children }: MapDataProviderProps) {
     return mapData;
   };
 
+  const getCircularMapData = (centerX: number, centerY: number, radius: number, width: number, height: number): number[][] => {
+    const halfWidth = Math.floor(width / 2);
+    const halfHeight = Math.floor(height / 2);
+    
+    const mapData: number[][] = [];
+    
+    for (let y = 0; y < height; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < width; x++) {
+        const worldX = centerX - halfWidth + x;
+        const worldY = centerY - halfHeight + y;
+        
+        // Calculate distance from center
+        const dx = worldX - centerX;
+        const dy = worldY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If outside radius, use a special "void" tile (we'll use -1 to indicate invisible)
+        if (distance > radius) {
+          row.push(-1); // Invisible/void tile
+        } else {
+          row.push(generateTileAt(worldX, worldY));
+        }
+      }
+      mapData.push(row);
+    }
+    
+    return mapData;
+  };
+
   const value: MapDataContextType = {
     getMapData,
+    getCircularMapData,
     generateTileAt,
   };
 

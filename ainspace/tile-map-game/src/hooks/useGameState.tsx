@@ -12,17 +12,18 @@ interface Position {
 
 const MAP_WIDTH = 16;
 const MAP_HEIGHT = 12;
+const VIEW_RADIUS = 6; // Circular view radius
 
 export function useGameState() {
-  const { getMapData, generateTileAt } = useMapData();
+  const { getMapData, getCircularMapData, generateTileAt } = useMapData();
   const { userId } = useSession();
   
   // Character starts at world position (0, 0), which will be center of the map
   const [worldPosition, setWorldPosition] = useState<Position>({ x: 0, y: 0 });
   const [isLoading, setIsLoading] = useState(true);
   
-  // Get the current map data centered on the player's world position
-  const mapData = getMapData(worldPosition.x, worldPosition.y, MAP_WIDTH, MAP_HEIGHT);
+  // Get the current map data centered on the player's world position with circular view
+  const mapData = getCircularMapData(worldPosition.x, worldPosition.y, VIEW_RADIUS, MAP_WIDTH, MAP_HEIGHT);
   
   // Player is always in the center of the visible map
   const playerPosition = { 
@@ -34,7 +35,8 @@ export function useGameState() {
   const { agents, visibleAgents } = useAgents({
     playerWorldPosition: worldPosition,
     mapWidth: MAP_WIDTH,
-    mapHeight: MAP_HEIGHT
+    mapHeight: MAP_HEIGHT,
+    viewRadius: VIEW_RADIUS
   });
 
   const savePositionToRedis = useCallback(async (position: Position) => {
