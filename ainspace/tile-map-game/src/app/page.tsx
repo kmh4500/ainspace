@@ -5,7 +5,7 @@ import ChatBox from '@/components/ChatBox';
 import { useGameState } from '@/hooks/useGameState';
 
 export default function Home() {
-  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents } = useGameState();
+  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -67,8 +67,24 @@ export default function Home() {
                     <span>Visible on map</span>
                   </div>
                 </div>
+
+                {/* Autonomous Control Button */}
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={toggleAutonomous}
+                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                      isAutonomous
+                        ? 'bg-red-500 hover:bg-red-600 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  >
+                    {isAutonomous ? '🔴 Stop Autonomous' : '▶️ Start Autonomous'}
+                  </button>
+                </div>
+
+
                 <div className="text-sm text-gray-500">
-                  <p>Use arrow keys to move</p>
+                  <p>{isAutonomous ? 'Moving autonomously...' : 'Use arrow keys to move'}</p>
                   <div className="flex justify-center mt-4 space-x-4">
                     <div className="flex items-center">
                       <div className="w-4 h-4 bg-green-400 mr-2"></div>
@@ -112,7 +128,12 @@ export default function Home() {
 
           {/* Chat Area */}
           <div className="w-80">
-            <ChatBox className="h-[600px]" />
+            <ChatBox 
+              className="h-[600px]" 
+              aiCommentary={lastCommentary}
+              agents={agents}
+              playerWorldPosition={worldPosition}
+            />
           </div>
         </div>
       </div>
