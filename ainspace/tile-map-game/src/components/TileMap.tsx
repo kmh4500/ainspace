@@ -27,8 +27,8 @@ export default function TileMap({ mapData, tileSize, playerPosition, agents = []
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Fill background with dark color (for void areas)
-    ctx.fillStyle = '#1a1a1a'; // Dark gray background
+    // Fill background with light color
+    ctx.fillStyle = '#f0f8ff'; // Light blue-white background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw tiles
@@ -36,8 +36,10 @@ export default function TileMap({ mapData, tileSize, playerPosition, agents = []
       for (let x = 0; x < mapData[y].length; x++) {
         const tileType = mapData[y][x];
         
-        // Skip void tiles (-1)
+        // Render void tiles as light background
         if (tileType === -1) {
+          ctx.fillStyle = '#f0f8ff'; // Same as background
+          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
           continue;
         }
         
@@ -113,11 +115,11 @@ export default function TileMap({ mapData, tileSize, playerPosition, agents = []
   return (
     <canvas
       ref={canvasRef}
-      width={mapData[0]?.length * tileSize || 800}
-      height={mapData.length * tileSize || 600}
-      className="border border-gray-400 rounded-lg"
+      width={mapData[0]?.length * tileSize || 400}
+      height={mapData.length * tileSize || 400}
+      className="border border-gray-400 rounded-lg max-w-full"
       style={{
-        background: '#1a1a1a'
+        background: '#f0f8ff'
       }}
     />
   );

@@ -1,4 +1,4 @@
-import { generateAgentResponse } from './gemini';
+// Removed direct gemini import to ensure server-side only calls
 
 export interface AgentState {
   id: string;
@@ -62,16 +62,31 @@ export abstract class BaseAgent {
     }
 
     try {
-      // Generate response using Gemini API
-      const responseText = await generateAgentResponse({
-        name: this.state.name,
-        behavior: this.state.behavior,
-        position: { x: this.state.x, y: this.state.y },
-        playerPosition: message.playerPosition,
-        distance: message.distance,
-        userMessage: message.content,
-        isMentioned: message.isMentioned
+      // Generate response using server-side API
+      const response = await fetch('/api/agent-response', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentData: {
+            name: this.state.name,
+            behavior: this.state.behavior,
+            position: { x: this.state.x, y: this.state.y },
+            playerPosition: message.playerPosition,
+            distance: message.distance,
+            userMessage: message.content,
+            isMentioned: message.isMentioned
+          }
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const responseText = data.response;
 
       return {
         agentId: this.state.id,
