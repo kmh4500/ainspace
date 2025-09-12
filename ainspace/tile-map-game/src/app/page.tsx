@@ -23,7 +23,7 @@ export default function Home() {
             <div className="flex justify-center mb-3">
               <TileMap 
                 mapData={mapData}
-                tileSize={32}
+                tileSize={40}
                 playerPosition={playerPosition}
                 agents={visibleAgents}
               />

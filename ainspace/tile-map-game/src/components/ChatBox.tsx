@@ -33,7 +33,6 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Initialize world system
@@ -53,13 +52,6 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
     }
   });
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   // Add AI commentary to messages when it changes
   useEffect(() => {
@@ -261,7 +253,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-        {messages.map((message) => (
+        {messages.slice().reverse().map((message) => (
           <div
             key={message.id}
             className={`flex flex-col ${
@@ -304,7 +296,6 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
             </span>
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
 
     </div>

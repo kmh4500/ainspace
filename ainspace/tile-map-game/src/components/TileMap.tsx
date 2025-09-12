@@ -62,11 +62,6 @@ export default function TileMap({ mapData, tileSize, playerPosition, agents = []
         }
 
         ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-        
-        // Draw tile borders
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
       }
     }
 

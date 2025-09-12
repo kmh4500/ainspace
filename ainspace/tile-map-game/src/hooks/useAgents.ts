@@ -183,30 +183,28 @@ export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius
     );
   }, [getAgentBehavior]);
 
-  // Get visible agents (within the circular view radius)
+  // Get visible agents (within the square view bounds)
   const getVisibleAgents = useCallback(() => {
     const halfWidth = Math.floor(mapWidth / 2);
     const halfHeight = Math.floor(mapHeight / 2);
     
     const minX = playerWorldPosition.x - halfWidth;
+    const maxX = playerWorldPosition.x + halfWidth;
     const minY = playerWorldPosition.y - halfHeight;
+    const maxY = playerWorldPosition.y + halfHeight;
 
     return agents
       .filter(agent => {
-        // Calculate distance from player to agent
-        const dx = agent.x - playerWorldPosition.x;
-        const dy = agent.y - playerWorldPosition.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Check if agent is within circular view radius
-        return distance <= viewRadius;
+        // Check if agent is within square view bounds
+        return agent.x >= minX && agent.x <= maxX && 
+               agent.y >= minY && agent.y <= maxY;
       })
       .map(agent => ({
         ...agent,
         screenX: agent.x - minX,
         screenY: agent.y - minY
       }));
-  }, [agents, playerWorldPosition, mapWidth, mapHeight, viewRadius]);
+  }, [agents, playerWorldPosition, mapWidth, mapHeight]);
 
   useEffect(() => {
     const interval = setInterval(updateAgents, 100);
