@@ -63,33 +63,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Agent Status - Collapsible */}
-          <div className="bg-white border-t">
-            <details className="group">
-              <summary className="p-3 cursor-pointer text-sm font-semibold text-gray-700 bg-gray-50">
-                Agent Status ({agents.length})
-              </summary>
-              <div className="p-3 space-y-2">
-                {agents.map((agent) => (
-                  <div key={agent.id} className="flex justify-between items-center text-xs">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-2 h-2 mr-2 rounded-sm"
-                        style={{ backgroundColor: agent.color }}
-                      ></div>
-                      <span className="text-gray-700">{agent.name}</span>
-                    </div>
-                    <div className="text-gray-500">
-                      ({agent.x}, {agent.y})
-                      {visibleAgents.some(va => va.id === agent.id) && 
-                        <span className="ml-1 text-green-600">●</span>
-                      }
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </details>
-          </div>
 
           {/* Chat Area - Takes remaining space */}
           <div className="flex-1 min-h-0">

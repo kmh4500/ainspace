@@ -202,59 +202,11 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
         <h3 className="font-semibold text-sm">Game Chat</h3>
       </div>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex flex-col ${
-              message.sender === 'user' ? 'items-end' : 'items-start'
-            }`}
-          >
-            <div
-              className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                message.sender === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : message.sender === 'ai'
-                  ? 'bg-green-100 text-green-800 rounded-bl-sm border border-green-300'
-                  : 'bg-gray-200 text-gray-800 rounded-bl-sm'
-              }`}
-            >
-              {message.sender === 'ai' && (
-                <div className="flex items-center mb-1">
-                  <span className="text-xs font-semibold text-green-600">
-                    🤖 {message.id.includes('agent-') ? 
-                      (() => {
-                        const agent = agents.find(a => message.id.includes(a.id));
-                        if (agent && playerWorldPosition) {
-                          const distance = Math.sqrt(
-                            Math.pow(agent.x - playerWorldPosition.x, 2) + 
-                            Math.pow(agent.y - playerWorldPosition.y, 2)
-                          );
-                          return `${agent.name} (${agent.x}, ${agent.y}) [${distance.toFixed(1)}u]`;
-                        }
-                        return agent ? `${agent.name} (${agent.x}, ${agent.y})` : 'AI Agent';
-                      })() : 
-                      'AI Explorer'
-                    }
-                  </span>
-                </div>
-              )}
-              <p className="break-words">{message.text}</p>
-            </div>
-            <span className="text-xs text-gray-500 mt-1">
-              {formatTime(message.timestamp)}
-            </span>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
       {/* Input Area */}
-      <div className="border-t p-3 relative">
+      <div className="border-b p-3 relative">
         {/* Agent Suggestions Dropdown */}
         {showSuggestions && filteredAgents.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-32 overflow-y-auto z-10">
+          <div className="absolute top-full left-3 right-3 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-32 overflow-y-auto z-10">
             {filteredAgents.map((agent, index) => {
               const distance = playerWorldPosition ? 
                 Math.sqrt(Math.pow(agent.x - playerWorldPosition.x, 2) + Math.pow(agent.y - playerWorldPosition.y, 2)) : 0;
@@ -306,6 +258,55 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
           </button>
         </div>
       </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex flex-col ${
+              message.sender === 'user' ? 'items-end' : 'items-start'
+            }`}
+          >
+            <div
+              className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                message.sender === 'user'
+                  ? 'bg-blue-600 text-white rounded-br-sm'
+                  : message.sender === 'ai'
+                  ? 'bg-green-100 text-green-800 rounded-bl-sm border border-green-300'
+                  : 'bg-gray-200 text-gray-800 rounded-bl-sm'
+              }`}
+            >
+              {message.sender === 'ai' && (
+                <div className="flex items-center mb-1">
+                  <span className="text-xs font-semibold text-green-600">
+                    🤖 {message.id.includes('agent-') ? 
+                      (() => {
+                        const agent = agents.find(a => message.id.includes(a.id));
+                        if (agent && playerWorldPosition) {
+                          const distance = Math.sqrt(
+                            Math.pow(agent.x - playerWorldPosition.x, 2) + 
+                            Math.pow(agent.y - playerWorldPosition.y, 2)
+                          );
+                          return `${agent.name} (${agent.x}, ${agent.y}) [${distance.toFixed(1)}u]`;
+                        }
+                        return agent ? `${agent.name} (${agent.x}, ${agent.y})` : 'AI Agent';
+                      })() : 
+                      'AI Explorer'
+                    }
+                  </span>
+                </div>
+              )}
+              <p className="break-words">{message.text}</p>
+            </div>
+            <span className="text-xs text-gray-500 mt-1">
+              {formatTime(message.timestamp)}
+            </span>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
     </div>
   );
 }
