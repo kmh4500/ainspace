@@ -15,7 +15,7 @@ const MAP_HEIGHT = 12;
 const VIEW_RADIUS = 6; // Circular view radius
 
 export function useGameState() {
-  const { getMapData, getCircularMapData, generateTileAt } = useMapData();
+  const { getCircularMapData, generateTileAt } = useMapData();
   const { userId } = useSession();
   
   // Character starts at world position (0, 0), which will be center of the map
@@ -36,7 +36,7 @@ export function useGameState() {
   };
 
   // Initialize agents system
-  const { agents, visibleAgents } = useAgents({
+  const { agents, worldAgents, visibleAgents } = useAgents({
     playerWorldPosition: worldPosition,
     mapWidth: MAP_WIDTH,
     mapHeight: MAP_HEIGHT,
@@ -294,6 +294,7 @@ export function useGameState() {
     isLoading,
     userId,
     agents,
+    worldAgents,
     visibleAgents,
     isAutonomous,
     toggleAutonomous,

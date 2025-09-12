@@ -5,7 +5,7 @@ import ChatBox from '@/components/ChatBox';
 import { useGameState } from '@/hooks/useGameState';
 
 export default function Home() {
-  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
+  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
@@ -131,7 +131,7 @@ export default function Home() {
             <ChatBox 
               className="h-[600px]" 
               aiCommentary={lastCommentary}
-              agents={agents}
+              agents={worldAgents}
               playerWorldPosition={worldPosition}
             />
           </div>

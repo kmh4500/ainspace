@@ -33,7 +33,11 @@ export async function savePlayerPosition(userId: string, position: { x: number; 
       lastUpdated: new Date().toISOString()
     };
     
-    await redis.hSet(`player:${userId}`, playerData);
+    await redis.hSet(`player:${userId}`, {
+      x: playerData.x.toString(),
+      y: playerData.y.toString(),
+      lastUpdated: playerData.lastUpdated
+    });
     await redis.expire(`player:${userId}`, 86400); // Expire after 24 hours
   } catch (error) {
     console.error('Error saving player position:', error);

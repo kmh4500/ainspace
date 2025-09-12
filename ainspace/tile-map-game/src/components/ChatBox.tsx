@@ -1,21 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useWorld } from '@/hooks/useWorld';
+import { Agent, AgentResponse } from '@/lib/world';
 
 interface Message {
   id: string;
   text: string;
   timestamp: Date;
   sender: 'user' | 'system' | 'ai';
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  color: string;
-  x: number;
-  y: number;
-  behavior: string;
 }
 
 interface ChatBoxProps {
@@ -43,44 +36,22 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Generate agent response using Gemini API
-  const generateAgentResponse = useCallback(async (agent: Agent, userMessage: string): Promise<string> => {
-    if (!playerWorldPosition) return `Agent ${agent.name} received your message.`;
-    
-    const distance = Math.sqrt(
-      Math.pow(agent.x - playerWorldPosition.x, 2) + 
-      Math.pow(agent.y - playerWorldPosition.y, 2)
-    );
-    
-    try {
-      const response = await fetch('/api/agent-response', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agentData: {
-            name: agent.name,
-            behavior: agent.behavior,
-            position: { x: agent.x, y: agent.y },
-            playerPosition: playerWorldPosition,
-            distance: distance,
-            userMessage: userMessage
-          }
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.response;
-      }
-    } catch (error) {
-      console.error('Failed to generate agent response:', error);
+  // Initialize world system
+  const { sendMessage, getAgentSuggestions } = useWorld({
+    agents: agents || [],
+    playerPosition: playerWorldPosition || { x: 0, y: 0 },
+    onAgentResponse: (response: AgentResponse) => {
+      // Add agent response to chat
+      const agentMessage: Message = {
+        id: `agent-${response.agentId}-${Date.now()}`,
+        text: response.message,
+        timestamp: new Date(),
+        sender: 'ai'
+      };
+      
+      setMessages(prev => [...prev, agentMessage]);
     }
-    
-    // Fallback if API fails
-    return `Agent ${agent.name} at (${agent.x}, ${agent.y}) received your message but couldn't respond properly.`;
-  }, [playerWorldPosition]);
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -111,7 +82,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
     }
   }, [aiCommentary]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputValue.trim()) {
       const newMessage: Message = {
         id: Date.now().toString(),
@@ -121,44 +92,11 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
       };
 
       setMessages(prev => [...prev, newMessage]);
+      const userMessageText = inputValue.trim();
       setInputValue('');
 
-      // Generate responses only from agents that are mentioned with @
-      const userMessageText = inputValue.trim();
-      const mentionedAgents = agents.filter(agent => {
-        const mentionPattern = new RegExp(`@${agent.name}\\b`, 'i');
-        return mentionPattern.test(userMessageText);
-      });
-
-      // If no agents are mentioned, no one responds
-      if (mentionedAgents.length === 0) {
-        return;
-      }
-
-      // Generate responses only from mentioned agents
-      mentionedAgents.forEach(async (agent, index) => {
-        const distance = playerWorldPosition ? 
-          Math.sqrt(Math.pow(agent.x - playerWorldPosition.x, 2) + Math.pow(agent.y - playerWorldPosition.y, 2)) : 0;
-        
-        // Calculate delay: distance / 10 units per second = seconds * 1000 for milliseconds
-        // Add base delay of 500ms + stagger of 100ms per agent to avoid simultaneous responses
-        const travelTimeMs = (distance / 10) * 1000;
-        const baseDelay = 500 + (index * 100);
-        const totalDelay = baseDelay + travelTimeMs;
-        
-        setTimeout(async () => {
-          const agentResponse = await generateAgentResponse(agent, userMessageText);
-          
-          const agentMessage: Message = {
-            id: `agent-${agent.id}-${Date.now() + index}`,
-            text: agentResponse,
-            timestamp: new Date(),
-            sender: 'ai'
-          };
-          
-          setMessages(prev => [...prev, agentMessage]);
-        }, totalDelay);
-      });
+      // Send message through world system
+      await sendMessage(userMessageText);
     }
   };
 
@@ -216,10 +154,8 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
     const atMatch = beforeCursor.match(/@(\w*)$/);
     
     if (atMatch) {
-      const searchTerm = atMatch[1].toLowerCase();
-      const filtered = agents.filter(agent => 
-        agent.name.toLowerCase().includes(searchTerm)
-      );
+      const searchTerm = atMatch[1];
+      const filtered = getAgentSuggestions(searchTerm);
       setFilteredAgents(filtered);
       setShowSuggestions(filtered.length > 0);
       setSelectedSuggestionIndex(0);
@@ -228,7 +164,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
       setFilteredAgents([]);
       setSelectedSuggestionIndex(0);
     }
-  }, [agents]);
+  }, [getAgentSuggestions]);
 
   // Handle suggestion selection
   const selectSuggestion = useCallback((agent: Agent) => {

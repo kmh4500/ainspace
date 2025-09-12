@@ -63,7 +63,7 @@ Generate your response now:`;
 export async function generateCommentary(gameState: {
   worldPosition: { x: number; y: number };
   currentTerrain: string;
-  visibleAgents: any[];
+  visibleAgents: { name: string; color: string }[];
   recentMovements: string[];
   biome: string;
 }): Promise<string> {

@@ -2,17 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useMapData } from '@/providers/MapDataProvider';
+import { Agent } from '@/lib/world';
 
-export interface Agent {
-  id: string;
-  x: number;
-  y: number;
-  color: string;
-  name: string;
+export interface AgentInternal extends Agent {
   direction: 'up' | 'down' | 'left' | 'right';
   lastMoved: number;
   moveInterval: number;
-  behavior: 'random' | 'patrol' | 'explorer';
 }
 
 interface UseAgentsProps {
@@ -25,7 +20,7 @@ interface UseAgentsProps {
 export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius }: UseAgentsProps) {
   const { generateTileAt } = useMapData();
   
-  const [agents, setAgents] = useState<Agent[]>([
+  const [agents, setAgents] = useState<AgentInternal[]>([
     {
       id: 'agent-1',
       x: 5,
@@ -81,7 +76,7 @@ export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius
     }
   };
 
-  const getAgentBehavior = useCallback((agent: Agent): { newX: number; newY: number; newDirection: 'up' | 'down' | 'left' | 'right' } => {
+  const getAgentBehavior = useCallback((agent: AgentInternal): { newX: number; newY: number; newDirection: 'up' | 'down' | 'left' | 'right' } => {
     const { x, y, direction, behavior } = agent;
 
     switch (behavior) {
@@ -136,16 +131,16 @@ export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius
         
         // If too close to player, move away
         if (playerDistance < 3) {
-          const awayFromPlayerDirections = [];
+          const awayFromPlayerDirections: ('up' | 'down' | 'left' | 'right')[] = [];
           if (x < playerWorldPosition.x) awayFromPlayerDirections.push('left');
           if (x > playerWorldPosition.x) awayFromPlayerDirections.push('right');
           if (y < playerWorldPosition.y) awayFromPlayerDirections.push('up');
           if (y > playerWorldPosition.y) awayFromPlayerDirections.push('down');
           
           for (const dir of awayFromPlayerDirections) {
-            const pos = moveInDirection(x, y, dir as any);
+            const pos = moveInDirection(x, y, dir);
             if (isWalkable(pos.x, pos.y)) {
-              return { newX: pos.x, newY: pos.y, newDirection: dir as any };
+              return { newX: pos.x, newY: pos.y, newDirection: dir };
             }
           }
         }
@@ -218,8 +213,21 @@ export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius
     return () => clearInterval(interval);
   }, [updateAgents]);
 
+  // Convert internal agents to world-compatible agents
+  const getWorldAgents = useCallback((): Agent[] => {
+    return agents.map(agent => ({
+      id: agent.id,
+      name: agent.name,
+      color: agent.color,
+      x: agent.x,
+      y: agent.y,
+      behavior: agent.behavior
+    }));
+  }, [agents]);
+
   return {
     agents,
+    worldAgents: getWorldAgents(),
     visibleAgents: getVisibleAgents(),
     updateAgents
   };
