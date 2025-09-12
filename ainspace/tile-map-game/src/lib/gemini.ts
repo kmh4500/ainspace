@@ -9,6 +9,7 @@ export async function generateAgentResponse(agentData: {
   playerPosition: { x: number; y: number };
   distance: number;
   userMessage: string;
+  isMentioned?: boolean;
 }): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -19,6 +20,10 @@ export async function generateAgentResponse(agentData: {
       'explorer': 'You are adventurous and seek out new territories, avoiding crowds when possible.'
     };
 
+    const responseType = agentData.isMentioned 
+      ? "You were directly mentioned with @ in this message, so respond directly and personally."
+      : "You overheard this message and are responding because it seems relevant to you. Be more casual and contextual.";
+
     const prompt = `You are ${agentData.name}, an AI agent in a tile-based adventure game. 
 
 Your characteristics:
@@ -27,14 +32,20 @@ Your characteristics:
 - Player position: (${agentData.playerPosition.x}, ${agentData.playerPosition.y})
 - Distance from player: ${agentData.distance.toFixed(1)} units
 
-The player just sent this message: "${agentData.userMessage}"
+The player sent this message: "${agentData.userMessage}"
+
+Context: ${responseType}
 
 Generate a response that:
 1. Reflects your unique personality and behavior type
-2. Acknowledges your current position 
+2. ${agentData.isMentioned ? 'Responds directly since you were mentioned' : 'Joins the conversation naturally since the topic interests you'}
 3. Considers the distance between you and the player
-4. Responds appropriately to the player's message
+4. ${agentData.isMentioned ? 'Acknowledges being called upon' : 'Shows why this topic caught your attention'}
 5. Is brief (1-2 sentences) but engaging
+
+Response style guidelines:
+- Mentioned responses: More direct and personal ("Thanks for calling me!", "You asked me about...")
+- Contextual responses: More observational ("I couldn't help but overhear...", "That reminds me...")
 
 Stay in character based on your behavior type:
 - Random agents are curious and spontaneous

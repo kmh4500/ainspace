@@ -1,3 +1,5 @@
+import { BaseAgent, createAgent, AgentState, Message as AgentMessage } from './agent';
+
 export interface Agent {
   id: string;
   name: string;
@@ -31,12 +33,28 @@ export interface AgentResponse {
 
 export class World {
   private agents: Agent[] = [];
+  private agentInstances: BaseAgent[] = [];
   private player: Player = { x: 0, y: 0 };
   private readonly MAX_SPEED = 10; // units per second
 
   constructor(agents: Agent[], player: Player) {
     this.agents = agents;
     this.player = player;
+    this.initializeAgentInstances();
+  }
+
+  private initializeAgentInstances(): void {
+    this.agentInstances = this.agents.map(agent => {
+      const agentState: AgentState = {
+        id: agent.id,
+        name: agent.name,
+        color: agent.color,
+        x: agent.x,
+        y: agent.y,
+        behavior: agent.behavior
+      };
+      return createAgent(agent.behavior, agentState);
+    });
   }
 
   updatePlayer(position: Player) {
@@ -45,6 +63,34 @@ export class World {
 
   updateAgents(agents: Agent[]) {
     this.agents = agents;
+    // Update existing agent instances or create new ones
+    this.agentInstances = agents.map(agent => {
+      // Find existing instance
+      const existingInstance = this.agentInstances.find(instance => instance.id === agent.id);
+      
+      if (existingInstance) {
+        // Update existing instance state
+        existingInstance.updateState({
+          x: agent.x,
+          y: agent.y,
+          color: agent.color,
+          name: agent.name,
+          behavior: agent.behavior
+        });
+        return existingInstance;
+      } else {
+        // Create new instance
+        const agentState: AgentState = {
+          id: agent.id,
+          name: agent.name,
+          color: agent.color,
+          x: agent.x,
+          y: agent.y,
+          behavior: agent.behavior
+        };
+        return createAgent(agent.behavior, agentState);
+      }
+    });
   }
 
   // Calculate Euclidean distance between two points
@@ -53,10 +99,11 @@ export class World {
   }
 
   // Calculate message travel delay based on distance
-  private calculateDelay(distance: number, baseDelay: number = 500): number {
+  private calculateResponseDelay(distance: number, baseDelay: number = 500): number {
     const travelTime = (distance / this.MAX_SPEED) * 1000; // Convert to milliseconds
     return baseDelay + travelTime;
   }
+
 
   // Extract mentioned agent names from message content
   private extractMentions(content: string): string[] {
@@ -81,73 +128,69 @@ export class World {
     );
   }
 
-  // Process incoming message and determine which agents should respond
+
+  // Process incoming message and deliver to each agent
   async processMessage(content: string): Promise<AgentResponse[]> {
     const mentions = this.extractMentions(content);
     
-    // If no mentions, no one responds
-    if (mentions.length === 0) {
-      return [];
-    }
-
-    const mentionedAgents = this.findMentionedAgents(mentions);
-    const responses: AgentResponse[] = [];
-
-    for (let i = 0; i < mentionedAgents.length; i++) {
-      const agent = mentionedAgents[i];
-      const distance = this.calculateDistance(this.player, { x: agent.x, y: agent.y });
-      
-      // Add stagger delay to prevent simultaneous responses
-      const staggerDelay = i * 100;
-      const totalDelay = this.calculateDelay(distance, 500 + staggerDelay);
-
-      // Generate agent response
-      const agentResponse = await this.generateAgentResponse(agent, content, distance);
-
-      responses.push({
-        agentId: agent.id,
-        agentName: agent.name,
-        message: agentResponse,
-        delay: totalDelay,
-        position: { x: agent.x, y: agent.y },
-        distance: distance
-      });
-    }
-
-    return responses;
-  }
-
-  // Generate response for a specific agent
-  private async generateAgentResponse(agent: Agent, userMessage: string, distance: number): Promise<string> {
-    try {
-      const response = await fetch('/api/agent-response', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agentData: {
-            name: agent.name,
-            behavior: agent.behavior,
-            position: { x: agent.x, y: agent.y },
-            playerPosition: this.player,
-            distance: distance,
-            userMessage: userMessage
-          }
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.response;
-      }
-    } catch (error) {
-      console.error(`Failed to generate response for ${agent.name}:`, error);
-    }
+    let respondingAgentInstances: BaseAgent[];
     
-    // Fallback response if API fails
-    return `${agent.name} at (${agent.x}, ${agent.y}) received your message but couldn't respond properly.`;
+    if (mentions.length > 0) {
+      // If there are mentions, only mentioned agents respond
+      const mentionedAgents = this.findMentionedAgents(mentions);
+      respondingAgentInstances = this.agentInstances.filter(instance => 
+        mentionedAgents.some(agent => agent.id === instance.id)
+      );
+    } else {
+      // If no mentions, all agents get the message
+      respondingAgentInstances = this.agentInstances;
+    }
+
+    // Process responses concurrently but with staggered delays
+    const responsePromises = respondingAgentInstances.map(async (agentInstance, index) => {
+      const distance = this.calculateDistance(this.player, agentInstance.position);
+      
+      // Check if this specific agent was mentioned
+      const mentionedAgents = this.findMentionedAgents(mentions);
+      const isMentioned = mentionedAgents.some(agent => agent.id === agentInstance.id);
+      
+      // Create message for agent
+      const agentMessage: AgentMessage = {
+        id: `msg-${Date.now()}-${index}`,
+        content: content,
+        sender: 'player',
+        timestamp: new Date(),
+        playerPosition: { ...this.player },
+        distance: distance,
+        isMentioned: isMentioned
+      };
+
+      // Calculate total delay (travel time + stagger)
+      const staggerDelay = index * 100;
+      const totalDelay = this.calculateResponseDelay(distance, 500 + staggerDelay);
+      
+      // Let agent process the message
+      const agentResponse = await agentInstance.processMessage(agentMessage, totalDelay);
+      
+      if (agentResponse) {
+        return {
+          agentId: agentResponse.agentId,
+          agentName: agentInstance.name,
+          message: agentResponse.message,
+          delay: agentResponse.delay,
+          position: { x: agentInstance.x, y: agentInstance.y },
+          distance: distance
+        };
+      }
+      
+      return null;
+    });
+
+    // Wait for all responses and filter out null values
+    const allResponses = await Promise.all(responsePromises);
+    return allResponses.filter((response): response is AgentResponse => response !== null);
   }
+
 
   // Get all agents within a certain radius (for autocomplete suggestions)
   getAgentsInRange(radius?: number): Agent[] {
