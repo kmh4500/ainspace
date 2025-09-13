@@ -4,7 +4,7 @@ import { World, Agent, Player, AgentResponse } from '@/lib/world';
 interface UseWorldProps {
   agents: Agent[];
   playerPosition: Player;
-  onAgentResponse?: (response: AgentResponse) => void;
+  onAgentResponse?: (response: AgentResponse & { threadId?: string }) => void;
 }
 
 export function useWorld({ agents, playerPosition, onAgentResponse }: UseWorldProps) {
@@ -21,15 +21,15 @@ export function useWorld({ agents, playerPosition, onAgentResponse }: UseWorldPr
   }, [agents, playerPosition]);
 
   // Send message through the world system
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, threadId?: string, broadcastRadius?: number) => {
     if (!worldRef.current) return;
 
-    const responses = await worldRef.current.processMessage(content);
+    const responses = await worldRef.current.processMessage(content, broadcastRadius, threadId);
     
     // Schedule each response based on its delay
     responses.forEach((response) => {
       setTimeout(() => {
-        onAgentResponse?.(response);
+        onAgentResponse?.({...response, threadId});
       }, response.delay);
     });
 

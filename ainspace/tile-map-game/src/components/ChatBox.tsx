@@ -9,6 +9,7 @@ interface Message {
   text: string;
   timestamp: Date;
   sender: 'user' | 'system' | 'ai';
+  threadId?: string;
 }
 
 interface ChatBoxProps {
@@ -17,19 +18,29 @@ interface ChatBoxProps {
   aiCommentary?: string;
   agents?: Agent[];
   playerWorldPosition?: { x: number; y: number };
+  currentThreadId?: string;
+  threads?: Array<{
+    id: string;
+    message: string;
+    timestamp: Date;
+    agentsReached: number;
+    agentNames: string[];
+  }>;
+  onThreadSelect?: (threadId: string) => void;
 }
 
 export interface ChatBoxRef {
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, threadId?: string, broadcastRadius?: number) => Promise<void>;
 }
 
-const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ className = '', aiCommentary, agents = [], playerWorldPosition }, ref) {
+const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ className = '', aiCommentary, agents = [], playerWorldPosition, currentThreadId, threads = [], onThreadSelect }, ref) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       text: 'Welcome to the Tile Map Game! Use arrow keys to move around.',
       timestamp: new Date(),
-      sender: 'system'
+      sender: 'system',
+      threadId: undefined // Welcome message is not part of any thread
     }
   ]);
   const [inputValue, setInputValue] = useState('');
@@ -43,14 +54,22 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
   const { sendMessage: worldSendMessage, getAgentSuggestions } = useWorld({
     agents: agents || [],
     playerPosition: playerWorldPosition || { x: 0, y: 0 },
-    onAgentResponse: (response: AgentResponse) => {
-      // Add agent response to chat
+    onAgentResponse: (response: AgentResponse & { threadId?: string }) => {
+      // Add agent response to chat with thread ID
       const agentMessage: Message = {
         id: `agent-${response.agentId}-${Date.now()}`,
         text: response.message,
         timestamp: new Date(),
-        sender: 'ai'
+        sender: 'ai',
+        threadId: response.threadId || currentThreadId || undefined
       };
+      
+      console.log('Agent response received:', {
+        agentId: response.agentId,
+        message: response.message,
+        threadId: agentMessage.threadId,
+        currentThreadId
+      });
       
       setMessages(prev => [...prev, agentMessage]);
     }
@@ -58,17 +77,19 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
 
   // Expose sendMessage function to parent components
   useImperativeHandle(ref, () => ({
-    sendMessage: async (message: string) => {
+    sendMessage: async (message: string, threadId?: string, broadcastRadius?: number) => {
       const newMessage: Message = {
         id: Date.now().toString(),
         text: message,
         timestamp: new Date(),
-        sender: 'user'
+        sender: 'user',
+        threadId: threadId || currentThreadId || undefined
       };
+      console.log('SendMessage (imperative):', { message, threadId, broadcastRadius, messageId: newMessage.id });
       setMessages(prev => [...prev, newMessage]);
-      await worldSendMessage(message);
+      await worldSendMessage(message, threadId, broadcastRadius);
     }
-  }), [worldSendMessage]);
+  }), [worldSendMessage, currentThreadId]);
 
 
   // Add AI commentary to messages when it changes
@@ -78,7 +99,8 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
         id: `ai-${Date.now()}`,
         text: aiCommentary,
         timestamp: new Date(),
-        sender: 'ai'
+        sender: 'ai',
+        threadId: undefined // AI commentary is not part of any thread
       };
 
       setMessages(prev => {
@@ -98,17 +120,31 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
         id: Date.now().toString(),
         text: inputValue.trim(),
         timestamp: new Date(),
-        sender: 'user'
+        sender: 'user',
+        threadId: currentThreadId || undefined
       };
 
+      console.log('HandleSendMessage:', { text: newMessage.text, threadId: newMessage.threadId, messageId: newMessage.id });
       setMessages(prev => [...prev, newMessage]);
       const userMessageText = inputValue.trim();
       setInputValue('');
 
-      // Send message through world system
-      await worldSendMessage(userMessageText);
+      // Send message through world system (no radius limit for regular chat)
+      await worldSendMessage(userMessageText, currentThreadId || undefined);
     }
   };
+
+  // Filter messages by current thread
+  const threadMessages = currentThreadId 
+    ? messages.filter(msg => msg.threadId === currentThreadId)
+    : messages.filter(msg => !msg.threadId);
+    
+  console.log('Thread filtering:', {
+    currentThreadId,
+    totalMessages: messages.length,
+    threadMessages: threadMessages.length,
+    messagesWithThread: messages.filter(m => m.threadId).length
+  });
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (showSuggestions && filteredAgents.length > 0) {
@@ -206,10 +242,38 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
   };
 
   return (
-    <div className={`flex flex-col bg-white h-full ${className}`}>
+    <div className={`flex flex-col bg-white h-full w-full ${className}`}>
       {/* Chat Header */}
       <div className="bg-blue-600 text-white p-3 flex-shrink-0">
-        <h3 className="font-semibold text-sm">Thread Messages</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Thread Messages</h3>
+          {threads.length > 0 && (
+            <select
+              value={currentThreadId || ''}
+              onChange={(e) => onThreadSelect?.(e.target.value)}
+              className="text-xs bg-blue-700 border border-blue-500 rounded px-2 py-1 text-white max-w-40 truncate"
+            >
+              <option value="">All Messages</option>
+              {threads.map((thread) => (
+                <option key={thread.id} value={thread.id}>
+                  {thread.message.slice(0, 20)}... ({thread.agentsReached})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        {currentThreadId && (
+          <div className="text-xs mt-1 text-blue-200 truncate">
+            {(() => {
+              const thread = threads.find(t => t.id === currentThreadId);
+              if (!thread) return '';
+              const agentNamesText = thread.agentNames.length > 3 
+                ? `${thread.agentNames.slice(0, 2).join(', ')} +${thread.agentNames.length - 2} more`
+                : thread.agentNames.join(', ');
+              return `${thread.agentsReached} agent${thread.agentsReached !== 1 ? 's' : ''}: ${agentNamesText}`;
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Input Area */}
@@ -271,7 +335,7 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 max-h-full">
-        {messages.slice().reverse().map((message) => (
+        {threadMessages.slice().reverse().map((message) => (
           <div
             key={message.id}
             className={`flex flex-col ${

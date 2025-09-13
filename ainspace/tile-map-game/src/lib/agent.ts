@@ -20,6 +20,7 @@ export interface Message {
   playerPosition: { x: number; y: number };
   distance: number;
   isMentioned: boolean;
+  threadId?: string;
 }
 
 export interface AgentResponse {
@@ -31,6 +32,7 @@ export interface AgentResponse {
 
 export abstract class BaseAgent {
   protected state: AgentState;
+  protected activeThreads: Set<string> = new Set();
 
   constructor(initialState: AgentState) {
     this.state = { ...initialState };
@@ -54,11 +56,47 @@ export abstract class BaseAgent {
   // Abstract method for agent-specific message processing
   protected abstract shouldRespondToMessage(): boolean;
 
+  // Add agent to a thread
+  joinThread(threadId: string): void {
+    this.activeThreads.add(threadId);
+  }
+
+  // Remove agent from a thread
+  leaveThread(threadId: string): void {
+    this.activeThreads.delete(threadId);
+  }
+
+  // Check if agent is in a thread
+  isInThread(threadId: string): boolean {
+    return this.activeThreads.has(threadId);
+  }
+
   // Process incoming message and generate response if appropriate
   async processMessage(message: Message, totalDelay: number): Promise<AgentResponse | null> {
-    // Check if this agent should respond
-    if (!message.isMentioned && !this.shouldRespondToMessage()) {
-      return null;
+    console.log(`Agent ${this.name} processing message:`, {
+      threadId: message.threadId,
+      isMentioned: message.isMentioned,
+      isInThread: message.threadId ? this.isInThread(message.threadId) : 'N/A',
+      activeThreads: Array.from(this.activeThreads)
+    });
+
+    // Check thread participation
+    if (message.threadId) {
+      // If this is a threaded message, only respond if we're in the thread OR being mentioned
+      if (!this.isInThread(message.threadId) && !message.isMentioned) {
+        console.log(`Agent ${this.name} not responding: not in thread ${message.threadId} and not mentioned`);
+        return null;
+      }
+      // If mentioned in a thread we're not in, join the thread
+      if (message.isMentioned && !this.isInThread(message.threadId)) {
+        console.log(`Agent ${this.name} joining thread ${message.threadId} due to mention`);
+        this.joinThread(message.threadId);
+      }
+    } else {
+      // For non-threaded messages, check if this agent should respond
+      if (!message.isMentioned && !this.shouldRespondToMessage()) {
+        return null;
+      }
     }
 
     try {

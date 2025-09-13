@@ -130,20 +130,35 @@ export class World {
 
 
   // Process incoming message and deliver to each agent
-  async processMessage(content: string): Promise<AgentResponse[]> {
+  async processMessage(content: string, broadcastRadius?: number, threadId?: string): Promise<AgentResponse[]> {
     const mentions = this.extractMentions(content);
     
     let respondingAgentInstances: BaseAgent[];
     
     if (mentions.length > 0) {
-      // If there are mentions, only mentioned agents respond
+      // If there are mentions, only mentioned agents respond (ignore radius for mentions)
       const mentionedAgents = this.findMentionedAgents(mentions);
       respondingAgentInstances = this.agentInstances.filter(instance => 
         mentionedAgents.some(agent => agent.id === instance.id)
       );
     } else {
-      // If no mentions, all agents get the message
-      respondingAgentInstances = this.agentInstances;
+      // If no mentions, filter agents by broadcast radius if specified
+      if (broadcastRadius !== undefined) {
+        respondingAgentInstances = this.agentInstances.filter(instance => {
+          const distance = this.calculateDistance(this.player, instance.position);
+          return distance <= broadcastRadius;
+        });
+        
+        // For broadcast messages, add agents to the thread
+        if (threadId) {
+          respondingAgentInstances.forEach(instance => {
+            instance.joinThread(threadId);
+          });
+        }
+      } else {
+        // If no radius specified, all agents get the message
+        respondingAgentInstances = this.agentInstances;
+      }
     }
 
     // Process responses concurrently but with staggered delays
@@ -162,7 +177,8 @@ export class World {
         timestamp: new Date(),
         playerPosition: { ...this.player },
         distance: distance,
-        isMentioned: isMentioned
+        isMentioned: isMentioned,
+        threadId: threadId
       };
 
       // Calculate total delay (travel time + stagger)

@@ -9,7 +9,14 @@ export default function Home() {
   const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
   const [activeTab, setActiveTab] = useState<'map' | 'thread'>('map');
   const [broadcastMessage, setBroadcastMessage] = useState('');
-  const [recentThread, setRecentThread] = useState<string | null>(null);
+  const [threads, setThreads] = useState<{
+    id: string;
+    message: string;
+    timestamp: Date;
+    agentsReached: number;
+    agentNames: string[];
+  }[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [broadcastStatus, setBroadcastStatus] = useState<{
     range: number;
     agentsReached: number;
@@ -37,6 +44,27 @@ export default function Home() {
         return distance <= broadcastRange;
       });
       
+      console.log('Broadcast setup:', {
+        totalAgents: worldAgents.length,
+        agentsInRange: agentsInRange.length,
+        agentNames: agentsInRange.map(a => a.name),
+        agentIds: agentsInRange.map(a => a.id)
+      });
+      
+      // Create new thread with unique ID
+      const threadId = `thread-${Date.now()}`;
+      const newThread = {
+        id: threadId,
+        message: messageText,
+        timestamp: new Date(),
+        agentsReached: agentsInRange.length,
+        agentNames: agentsInRange.map(agent => agent.name)
+      };
+      
+      // Add to threads list and set as current thread
+      setThreads(prev => [newThread, ...prev]);
+      setCurrentThreadId(threadId);
+      
       // Set broadcast status
       setBroadcastStatus({
         range: broadcastRange,
@@ -44,16 +72,14 @@ export default function Home() {
         agentNames: agentsInRange.map(agent => agent.name)
       });
       
-      // Create thread and send to agents
-      setRecentThread(messageText);
       setBroadcastMessage('');
       
       // Send message through ChatBox system to get agent responses
       if (agentsInRange.length > 0 && chatBoxRef.current) {
         try {
-          // Send the broadcast message through the ChatBox system
-          await chatBoxRef.current.sendMessage(messageText);
-          console.log(`Broadcasting "${messageText}" to ${agentsInRange.length} agents:`, agentsInRange.map(a => a.name));
+          // Send the broadcast message through the ChatBox system with thread ID and radius
+          await chatBoxRef.current.sendMessage(messageText, threadId, broadcastRange);
+          console.log(`Broadcasting "${messageText}" to ${agentsInRange.length} agents in thread ${threadId}:`, agentsInRange.map(a => a.name));
         } catch (error) {
           console.error('Failed to broadcast message:', error);
         }
@@ -66,14 +92,20 @@ export default function Home() {
     }
   };
 
-  const handleViewThread = () => {
+  const handleViewThread = (threadId?: string) => {
+    // Set current thread if specified, otherwise use most recent
+    if (threadId) {
+      setCurrentThreadId(threadId);
+    } else if (threads.length > 0) {
+      setCurrentThreadId(threads[0].id);
+    }
     // Switch to thread tab to view the conversation
     setActiveTab('thread');
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <div className="max-w-md mx-auto flex-1 flex flex-col">
+      <div className={`mx-auto flex-1 flex flex-col ${activeTab === 'map' ? 'max-w-md' : 'max-w-2xl w-full px-4'}`}>
         {/* Header */}
         <div className="bg-white p-4 shadow-sm">
           <h1 className="text-xl font-bold text-center text-gray-800">
@@ -186,7 +218,7 @@ export default function Home() {
                       Sent {broadcastStatus.range}u range
                     </span>
                   )}
-                  {recentThread && !broadcastStatus && (
+                  {threads.length > 0 && !broadcastStatus && (
                     <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
                       Thread created
                     </span>
@@ -212,13 +244,15 @@ export default function Home() {
                   </div>
                 )}
                 
-                {recentThread && !broadcastStatus ? (
+                {threads.length > 0 && !broadcastStatus ? (
                   <div className="bg-white border border-gray-200 rounded p-2 mb-2">
-                    <p className="text-sm text-gray-800">{recentThread}</p>
+                    <p className="text-sm text-gray-800">{threads[0].message}</p>
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-gray-500">Recent thread started</span>
+                      <span className="text-xs text-gray-500">
+                        Recent thread • {threads[0].agentsReached} agent{threads[0].agentsReached !== 1 ? 's' : ''}
+                      </span>
                       <button
-                        onClick={handleViewThread}
+                        onClick={() => handleViewThread(threads[0].id)}
                         className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
                       >
                         View Thread
@@ -292,6 +326,9 @@ export default function Home() {
               aiCommentary={lastCommentary}
               agents={worldAgents}
               playerWorldPosition={worldPosition}
+              currentThreadId={currentThreadId || undefined}
+              threads={threads}
+              onThreadSelect={setCurrentThreadId}
             />
           </div>
         </div>
