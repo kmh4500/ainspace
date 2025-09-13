@@ -16,7 +16,7 @@ export default function BaseTabContent({
   const paddingClass = withPadding ? 'p-4' : '';
   
   return (
-    <div className={`h-full ${paddingClass} flex flex-col ${!isActive ? 'hidden' : ''} ${className}`}>
+    <div className={`h-full w-full ${paddingClass} flex flex-col ${!isActive ? 'hidden' : ''} ${className}`}>
       {children}
     </div>
   );

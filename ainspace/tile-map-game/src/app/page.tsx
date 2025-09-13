@@ -6,10 +6,11 @@ import { ChatBoxRef } from '@/components/ChatBox';
 import MapTab from '@/components/tabs/MapTab';
 import ThreadTab from '@/components/tabs/ThreadTab';
 import BuildTab from '@/components/tabs/BuildTab';
+import AgentTab from '@/components/tabs/AgentTab';
 
 export default function Home() {
   const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
-  const [activeTab, setActiveTab] = useState<'map' | 'thread' | 'build'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'thread' | 'build' | 'agent'>('map');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [threads, setThreads] = useState<{
     id: string;
@@ -252,6 +253,16 @@ export default function Home() {
             >
               🔨 Build
             </button>
+            <button
+              onClick={() => setActiveTab('agent')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'agent'
+                  ? 'bg-purple-600 text-white border-b-2 border-purple-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              🤖 Agent
+            </button>
           </div>
         </div>
         
@@ -308,6 +319,10 @@ export default function Home() {
             publishStatus={publishStatus}
             userId={userId}
             onPublishTiles={handlePublishTiles}
+          />
+          
+          <AgentTab
+            isActive={activeTab === 'agent'}
           />
         </div>
       </div>
