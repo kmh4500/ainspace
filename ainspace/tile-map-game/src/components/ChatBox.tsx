@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useWorld } from '@/hooks/useWorld';
 import { Agent, AgentResponse } from '@/lib/world';
 
@@ -19,7 +19,11 @@ interface ChatBoxProps {
   playerWorldPosition?: { x: number; y: number };
 }
 
-export default function ChatBox({ className = '', aiCommentary, agents = [], playerWorldPosition }: ChatBoxProps) {
+export interface ChatBoxRef {
+  sendMessage: (message: string) => Promise<void>;
+}
+
+const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ className = '', aiCommentary, agents = [], playerWorldPosition }, ref) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -36,7 +40,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Initialize world system
-  const { sendMessage, getAgentSuggestions } = useWorld({
+  const { sendMessage: worldSendMessage, getAgentSuggestions } = useWorld({
     agents: agents || [],
     playerPosition: playerWorldPosition || { x: 0, y: 0 },
     onAgentResponse: (response: AgentResponse) => {
@@ -51,6 +55,20 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
       setMessages(prev => [...prev, agentMessage]);
     }
   });
+
+  // Expose sendMessage function to parent components
+  useImperativeHandle(ref, () => ({
+    sendMessage: async (message: string) => {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        text: message,
+        timestamp: new Date(),
+        sender: 'user'
+      };
+      setMessages(prev => [...prev, newMessage]);
+      await worldSendMessage(message);
+    }
+  }), [worldSendMessage]);
 
 
   // Add AI commentary to messages when it changes
@@ -88,7 +106,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
       setInputValue('');
 
       // Send message through world system
-      await sendMessage(userMessageText);
+      await worldSendMessage(userMessageText);
     }
   };
 
@@ -188,14 +206,14 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
   };
 
   return (
-    <div className={`flex flex-col bg-white rounded-lg shadow-lg ${className}`}>
+    <div className={`flex flex-col bg-white h-full ${className}`}>
       {/* Chat Header */}
-      <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-        <h3 className="font-semibold text-sm">Game Chat</h3>
+      <div className="bg-blue-600 text-white p-3 flex-shrink-0">
+        <h3 className="font-semibold text-sm">Thread Messages</h3>
       </div>
 
       {/* Input Area */}
-      <div className="border-b p-3 relative">
+      <div className="border-b p-3 relative flex-shrink-0">
         {/* Agent Suggestions Dropdown */}
         {showSuggestions && filteredAgents.length > 0 && (
           <div className="absolute top-full left-3 right-3 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-32 overflow-y-auto z-10">
@@ -252,7 +270,7 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 max-h-full">
         {messages.slice().reverse().map((message) => (
           <div
             key={message.id}
@@ -300,4 +318,6 @@ export default function ChatBox({ className = '', aiCommentary, agents = [], pla
 
     </div>
   );
-}
+});
+
+export default ChatBox;

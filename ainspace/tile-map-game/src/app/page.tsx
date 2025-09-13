@@ -1,73 +1,294 @@
 'use client';
 
 import TileMap from '@/components/TileMap';
-import ChatBox from '@/components/ChatBox';
+import ChatBox, { ChatBoxRef } from '@/components/ChatBox';
 import { useGameState } from '@/hooks/useGameState';
+import { useState, useRef } from 'react';
 
 export default function Home() {
-  const { playerPosition, mapData, worldPosition, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
+  const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
+  const [activeTab, setActiveTab] = useState<'map' | 'thread'>('map');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [recentThread, setRecentThread] = useState<string | null>(null);
+  const [broadcastStatus, setBroadcastStatus] = useState<{
+    range: number;
+    agentsReached: number;
+    agentNames: string[];
+  } | null>(null);
+  const chatBoxRef = useRef<ChatBoxRef>(null);
+
+  const handleMobileMove = (direction: 'up' | 'down' | 'left' | 'right') => {
+    if (!isAutonomous) {
+      movePlayer(direction);
+    }
+  };
+
+  const handleBroadcast = async () => {
+    if (broadcastMessage.trim()) {
+      const messageText = broadcastMessage.trim();
+      
+      // Calculate agents within range (default broadcast range: 10 units)
+      const broadcastRange = 10;
+      const agentsInRange = worldAgents.filter(agent => {
+        const distance = Math.sqrt(
+          Math.pow(agent.x - worldPosition.x, 2) + 
+          Math.pow(agent.y - worldPosition.y, 2)
+        );
+        return distance <= broadcastRange;
+      });
+      
+      // Set broadcast status
+      setBroadcastStatus({
+        range: broadcastRange,
+        agentsReached: agentsInRange.length,
+        agentNames: agentsInRange.map(agent => agent.name)
+      });
+      
+      // Create thread and send to agents
+      setRecentThread(messageText);
+      setBroadcastMessage('');
+      
+      // Send message through ChatBox system to get agent responses
+      if (agentsInRange.length > 0 && chatBoxRef.current) {
+        try {
+          // Send the broadcast message through the ChatBox system
+          await chatBoxRef.current.sendMessage(messageText);
+          console.log(`Broadcasting "${messageText}" to ${agentsInRange.length} agents:`, agentsInRange.map(a => a.name));
+        } catch (error) {
+          console.error('Failed to broadcast message:', error);
+        }
+      }
+      
+      // Clear broadcast status after 5 seconds
+      setTimeout(() => {
+        setBroadcastStatus(null);
+      }, 5000);
+    }
+  };
+
+  const handleViewThread = () => {
+    // Switch to thread tab to view the conversation
+    setActiveTab('thread');
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="max-w-md mx-auto">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <div className="max-w-md mx-auto flex-1 flex flex-col">
         {/* Header */}
         <div className="bg-white p-4 shadow-sm">
           <h1 className="text-xl font-bold text-center text-gray-800">
-            Tile Map Game
+            AIN Space
           </h1>
         </div>
         
-        <div className="flex flex-col">
-          {/* Game Area */}
-          <div className="bg-white p-4 shadow-sm">
-            <div className="flex justify-center mb-3">
-              <TileMap 
-                mapData={mapData}
-                tileSize={40}
-                playerPosition={playerPosition}
-                agents={visibleAgents}
-              />
-            </div>
-            
-            {/* Compact Info */}
-            <div className="space-y-2">
-              <div className="text-center">
-                <p className="text-gray-600 text-sm">
-                  World: ({worldPosition.x}, {worldPosition.y})
-                </p>
-                {userId && (
-                  <p className="text-gray-400 text-xs">
-                    {userId.slice(0, 8)}... {isLoading ? '(Loading...)' : '(Saved)'}
-                  </p>
+        {/* Tab Navigation */}
+        <div className="bg-white border-b">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('map')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'map'
+                  ? 'bg-blue-600 text-white border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              🗺️ Map
+            </button>
+            <button
+              onClick={() => setActiveTab('thread')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'thread'
+                  ? 'bg-blue-600 text-white border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              💬 Thread
+            </button>
+          </div>
+        </div>
+        
+        {/* Tab Content */}
+        <div className="flex-1 bg-white relative">
+          {/* Map Tab Content */}
+          <div className={`h-full p-4 flex flex-col ${activeTab !== 'map' ? 'hidden' : ''}`}>
+            {/* Game Area */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex justify-center mb-4">
+                <TileMap 
+                  mapData={mapData}
+                  tileSize={40}
+                  playerPosition={playerPosition}
+                  agents={visibleAgents}
+                />
+              </div>
+              
+              {/* Mobile Arrow Controls */}
+              <div className="flex flex-col items-center mb-4">
+                {/* Top Row - Up Button */}
+                <div className="flex justify-center mb-2">
+                  <button
+                    onClick={() => handleMobileMove('up')}
+                    disabled={isAutonomous}
+                    className={`w-12 h-12 rounded text-xl font-bold transition-colors ${
+                      isAutonomous 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-md'
+                    }`}
+                  >
+                    ↑
+                  </button>
+                </div>
+                
+                {/* Bottom Row - Left, Down, Right Buttons */}
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleMobileMove('left')}
+                    disabled={isAutonomous}
+                    className={`w-12 h-12 rounded text-xl font-bold transition-colors ${
+                      isAutonomous 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-md'
+                    }`}
+                  >
+                    ←
+                  </button>
+                  <button
+                    onClick={() => handleMobileMove('down')}
+                    disabled={isAutonomous}
+                    className={`w-12 h-12 rounded text-xl font-bold transition-colors ${
+                      isAutonomous 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-md'
+                    }`}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => handleMobileMove('right')}
+                    disabled={isAutonomous}
+                    className={`w-12 h-12 rounded text-xl font-bold transition-colors ${
+                      isAutonomous 
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white shadow-md'
+                    }`}
+                  >
+                    →
+                  </button>
+                </div>
+              </div>
+              
+              {/* Broadcast Message Box */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700 mr-2">📢 Broadcast:</span>
+                  {broadcastStatus && (
+                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full animate-pulse">
+                      Sent {broadcastStatus.range}u range
+                    </span>
+                  )}
+                  {recentThread && !broadcastStatus && (
+                    <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">
+                      Thread created
+                    </span>
+                  )}
+                </div>
+                
+                {/* Broadcast Status */}
+                {broadcastStatus && (
+                  <div className="bg-orange-50 border border-orange-200 rounded p-2 mb-2">
+                    <div className="text-xs text-orange-800 mb-1">
+                      📶 Message broadcast {broadcastStatus.range} units from ({worldPosition.x}, {worldPosition.y})
+                    </div>
+                    <div className="text-xs text-orange-700">
+                      🤖 Reached {broadcastStatus.agentsReached} agent{broadcastStatus.agentsReached !== 1 ? 's' : ''}:
+                      {broadcastStatus.agentNames.length > 0 ? (
+                        <span className="ml-1 font-medium">
+                          {broadcastStatus.agentNames.join(', ')}
+                        </span>
+                      ) : (
+                        <span className="ml-1 text-gray-500">No agents in range</span>
+                      )}
+                    </div>
+                  </div>
                 )}
+                
+                {recentThread && !broadcastStatus ? (
+                  <div className="bg-white border border-gray-200 rounded p-2 mb-2">
+                    <p className="text-sm text-gray-800">{recentThread}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-gray-500">Recent thread started</span>
+                      <button
+                        onClick={handleViewThread}
+                        className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
+                      >
+                        View Thread
+                      </button>
+                    </div>
+                  </div>
+                ) : !broadcastStatus && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    Start a conversation with agents nearby (10u range)
+                  </div>
+                )}
+                
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={broadcastMessage}
+                    onChange={(e) => setBroadcastMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleBroadcast()}
+                    placeholder="Type broadcast message..."
+                    className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    onClick={handleBroadcast}
+                    disabled={!broadcastMessage.trim()}
+                    className="px-3 py-1 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Send
+                  </button>
+                </div>
               </div>
               
-              {/* Autonomous Control Button */}
-              <div className="flex justify-center">
-
-                <button
-                  onClick={toggleAutonomous}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isAutonomous
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
-                  }`}
-                >
-                  {isAutonomous ? '🔴 Stop' : '▶️ Auto'}
-                </button>
-              </div>
-              
-              <div className="text-center text-xs text-gray-500">
-                {isAutonomous ? 'Moving autonomously...' : 'Use arrow keys to move'}
+              {/* Compact Info */}
+              <div className="space-y-2">
+                <div className="text-center">
+                  <p className="text-gray-600 text-sm">
+                    World: ({worldPosition.x}, {worldPosition.y})
+                  </p>
+                  {userId && (
+                    <p className="text-gray-400 text-xs">
+                      {userId.slice(0, 8)}... {isLoading ? '(Loading...)' : '(Saved)'}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Autonomous Control Button */}
+                <div className="flex justify-center">
+                  <button
+                    onClick={toggleAutonomous}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isAutonomous
+                        ? 'bg-red-500 hover:bg-red-600 text-white'
+                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    }`}
+                  >
+                    {isAutonomous ? '🔴 Stop' : '▶️ Auto'}
+                  </button>
+                </div>
+                
+                <div className="text-center text-xs text-gray-500">
+                  {isAutonomous ? 'Moving autonomously...' : 'Use arrow keys to move'}
+                </div>
               </div>
             </div>
           </div>
-
-
-          {/* Chat Area - Takes remaining space */}
-          <div className="flex-1 min-h-0">
+          
+          {/* Thread Tab Content - Always rendered but conditionally visible */}
+          <div className={`h-full ${activeTab !== 'thread' ? 'hidden' : ''}`}>
             <ChatBox 
-              className="h-[400px]" 
+              ref={chatBoxRef}
+              className="h-full" 
               aiCommentary={lastCommentary}
               agents={worldAgents}
               playerWorldPosition={worldPosition}
