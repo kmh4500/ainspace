@@ -3,11 +3,11 @@
 import TileMap from '@/components/TileMap';
 import ChatBox, { ChatBoxRef } from '@/components/ChatBox';
 import { useGameState } from '@/hooks/useGameState';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function Home() {
   const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
-  const [activeTab, setActiveTab] = useState<'map' | 'thread'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'thread' | 'build'>('map');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [threads, setThreads] = useState<{
     id: string;
@@ -23,6 +23,46 @@ export default function Home() {
     agentNames: string[];
   } | null>(null);
   const chatBoxRef = useRef<ChatBoxRef>(null);
+  
+  // Build mode state
+  const [customTiles, setCustomTiles] = useState<{
+    [key: string]: string; // key: "x,y", value: image data URL
+  }>({});
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [buildMode, setBuildMode] = useState<'select' | 'paint'>('select');
+  const [registeredImages, setRegisteredImages] = useState<{
+    [key: string]: string; // key: image name/id, value: image data URL
+  }>({});
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const [publishedTiles, setPublishedTiles] = useState<{
+    [key: string]: string;
+  }>({});
+
+  // Load custom tiles when userId is available
+  useEffect(() => {
+    const loadCustomTiles = async () => {
+      if (!userId) return;
+
+      try {
+        const response = await fetch(`/api/custom-tiles?userId=${userId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.isDefault && Object.keys(data.tiles).length > 0) {
+            setPublishedTiles(data.tiles);
+            console.log(`Loaded ${Object.keys(data.tiles).length} published tiles from server`);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load custom tiles:', error);
+      }
+    };
+
+    loadCustomTiles();
+  }, [userId]);
 
   const handleMobileMove = (direction: 'up' | 'down' | 'left' | 'right') => {
     if (!isAutonomous) {
@@ -105,6 +145,68 @@ export default function Home() {
     setActiveTab('thread');
   };
 
+  const handlePublishTiles = async () => {
+    if (!userId || Object.keys(customTiles).length === 0) {
+      setPublishStatus({
+        type: 'error',
+        message: 'No custom tiles to publish'
+      });
+      return;
+    }
+
+    setIsPublishing(true);
+    setPublishStatus(null);
+
+    try {
+      const response = await fetch('/api/custom-tiles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          customTiles: customTiles
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPublishStatus({
+        type: 'success',
+        message: `Published ${data.tileCount} custom tiles successfully!`
+      });
+
+      // Move custom tiles to published tiles and reset build state
+      setPublishedTiles(prev => ({ ...prev, ...customTiles }));
+      setCustomTiles({}); // Clear draft tiles since they're now published
+      setSelectedImage(null);
+      setBuildMode('select');
+      // Note: Don't clear registeredImages - they should persist
+
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setPublishStatus(null);
+      }, 5000);
+
+    } catch (error) {
+      console.error('Failed to publish custom tiles:', error);
+      setPublishStatus({
+        type: 'error',
+        message: 'Failed to publish tiles. Please try again.'
+      });
+
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setPublishStatus(null);
+      }, 5000);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="max-w-md mx-auto flex-1 flex flex-col">
@@ -138,6 +240,16 @@ export default function Home() {
             >
               💬 Thread
             </button>
+            <button
+              onClick={() => setActiveTab('build')}
+              className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'build'
+                  ? 'bg-orange-600 text-white border-b-2 border-orange-600'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+              }`}
+            >
+              🔨 Build
+            </button>
           </div>
         </div>
         
@@ -152,7 +264,9 @@ export default function Home() {
                   mapData={mapData}
                   tileSize={40}
                   playerPosition={playerPosition}
+                  worldPosition={worldPosition}
                   agents={visibleAgents}
+                  customTiles={{ ...publishedTiles, ...customTiles }}
                 />
               </div>
               
@@ -332,6 +446,215 @@ export default function Home() {
               threads={threads}
               onThreadSelect={setCurrentThreadId}
             />
+          </div>
+          
+          {/* Build Tab Content */}
+          <div className={`h-full ${activeTab !== 'build' ? 'hidden' : ''}`}>
+            <div className="h-full flex flex-col">
+              {/* Build Header */}
+              <div className="bg-orange-600 text-white p-3 flex-shrink-0">
+                <h3 className="font-semibold text-sm">🔨 Build Mode</h3>
+                <p className="text-xs text-orange-200 mt-1">Upload images and click tiles to customize your map</p>
+              </div>
+              
+              {/* Build Controls */}
+              <div className="p-3 border-b bg-gray-50 flex-shrink-0 space-y-3">
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Upload Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const dataUrl = event.target?.result as string;
+                          const imageId = `img-${Date.now()}-${file.name}`;
+                          
+                          // Add to registered images
+                          setRegisteredImages(prev => ({
+                            ...prev,
+                            [imageId]: dataUrl
+                          }));
+                          
+                          setSelectedImage(dataUrl);
+                          setBuildMode('paint'); // Auto-switch to paint mode
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-medium file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                  />
+                </div>
+                
+                {/* Registered Images */}
+                {Object.keys(registeredImages).length > 0 && (
+                  <div className="bg-white p-2 rounded border">
+                    <p className="text-xs font-medium text-gray-700 mb-2">📂 Registered Images ({Object.keys(registeredImages).length})</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {Object.entries(registeredImages).map(([imageId, dataUrl]) => (
+                        <div key={imageId} className="relative group">
+                          <button
+                            onClick={() => {
+                              setSelectedImage(dataUrl);
+                              setBuildMode('paint');
+                            }}
+                            className={`w-full aspect-square border rounded overflow-hidden hover:ring-2 hover:ring-orange-300 transition-all ${
+                              selectedImage === dataUrl
+                                ? 'ring-2 ring-orange-500'
+                                : 'border-gray-300'
+                            }`}
+                          >
+                            <img 
+                              src={dataUrl} 
+                              alt="Registered" 
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Selected Image Preview & Controls */}
+                {selectedImage && (
+                  <div className="bg-white p-2 rounded border">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="w-8 h-8 border border-orange-300 rounded overflow-hidden flex-shrink-0">
+                        <img 
+                          src={selectedImage} 
+                          alt="Selected" 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-600">Ready to paint tiles</p>
+                      </div>
+                    </div>
+                    
+                    {/* Build Mode Toggle */}
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setBuildMode('select')}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          buildMode === 'select'
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        📁 Select
+                      </button>
+                      <button
+                        onClick={() => setBuildMode('paint')}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          buildMode === 'paint'
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        🎨 Paint
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setBuildMode('select');
+                        }}
+                        className="px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-colors"
+                      >
+                        ❌ Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+              </div>
+              
+              {/* Build Map Area */}
+              <div className="flex-1 p-3 overflow-auto">
+                <div className="flex justify-center mb-2">
+                  <TileMap 
+                    mapData={mapData}
+                    tileSize={32}
+                    playerPosition={playerPosition}
+                    worldPosition={worldPosition}
+                    agents={visibleAgents}
+                    customTiles={{ ...publishedTiles, ...customTiles }}
+                    buildMode={buildMode === 'paint' && selectedImage ? 'paint' : 'view'}
+                    onTileClick={(worldX, worldY) => {
+                      if (buildMode === 'paint' && selectedImage) {
+                        const key = `${worldX},${worldY}`;
+                        setCustomTiles(prev => ({
+                          ...prev,
+                          [key]: selectedImage
+                        }));
+                      }
+                    }}
+                  />
+                </div>
+                
+                {/* Instructions */}
+                <div className="text-center text-xs text-gray-600 space-y-1 mb-3">
+                  {buildMode === 'select' ? (
+                    <p>📁 Upload an image to start customizing tiles</p>
+                  ) : selectedImage ? (
+                    <>
+                      <p>🎨 Click on tiles to paint them with your image</p>
+                      <p className="text-gray-500">Tip: Each click replaces that tile with your image</p>
+                    </>
+                  ) : (
+                    <p>⚠️ Select an image first to start painting tiles</p>
+                  )}
+                </div>
+                
+                {/* Custom Tiles Management - Below Map */}
+                {Object.keys(customTiles).length > 0 && !publishStatus && (
+                  <div className="bg-blue-50 p-3 rounded border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-700">
+                        🎨 {Object.keys(customTiles).length} custom tile{Object.keys(customTiles).length !== 1 ? 's' : ''} ready
+                      </span>
+                    </div>
+                    <div className="flex space-x-2 justify-center">
+                      <button
+                        onClick={handlePublishTiles}
+                        disabled={isPublishing || !userId}
+                        className="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isPublishing ? '📤 Publishing...' : '📤 Publish Tiles'}
+                      </button>
+                      <button
+                        onClick={() => setCustomTiles({})}
+                        className="px-4 py-2 bg-red-500 text-white rounded text-sm font-medium hover:bg-red-600 transition-colors"
+                      >
+                        🗑️ Clear All
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 text-center mt-2">These tiles will be saved to your world permanently</p>
+                  </div>
+                )}
+                
+                {/* Publish Status - Below Map */}
+                {publishStatus && (
+                  <div className={`p-3 rounded border text-sm ${
+                    publishStatus.type === 'success' 
+                      ? 'bg-green-50 border-green-200 text-green-700' 
+                      : 'bg-red-50 border-red-200 text-red-700'
+                  }`}>
+                    <div className="flex items-center justify-center">
+                      <span className="mr-2 text-lg">
+                        {publishStatus.type === 'success' ? '✅' : '❌'}
+                      </span>
+                      {publishStatus.message}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

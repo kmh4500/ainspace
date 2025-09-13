@@ -74,3 +74,56 @@ export async function deletePlayerPosition(userId: string): Promise<void> {
     throw error;
   }
 }
+
+export interface CustomTilesData {
+  tiles: { [key: string]: string };
+  lastUpdated: string;
+}
+
+export async function saveCustomTiles(userId: string, customTiles: { [key: string]: string }): Promise<void> {
+  try {
+    const redis = await getRedisClient();
+    const customTilesData: CustomTilesData = {
+      tiles: customTiles,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    await redis.hSet(`custom-tiles:${userId}`, {
+      tiles: JSON.stringify(customTilesData.tiles),
+      lastUpdated: customTilesData.lastUpdated
+    });
+    await redis.expire(`custom-tiles:${userId}`, 86400 * 7); // Expire after 7 days
+  } catch (error) {
+    console.error('Error saving custom tiles:', error);
+    throw error;
+  }
+}
+
+export async function getCustomTiles(userId: string): Promise<CustomTilesData | null> {
+  try {
+    const redis = await getRedisClient();
+    const customTilesData = await redis.hGetAll(`custom-tiles:${userId}`);
+    
+    if (!customTilesData || Object.keys(customTilesData).length === 0) {
+      return null;
+    }
+    
+    return {
+      tiles: JSON.parse(customTilesData.tiles || '{}'),
+      lastUpdated: customTilesData.lastUpdated || new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error getting custom tiles:', error);
+    return null;
+  }
+}
+
+export async function deleteCustomTiles(userId: string): Promise<void> {
+  try {
+    const redis = await getRedisClient();
+    await redis.del(`custom-tiles:${userId}`);
+  } catch (error) {
+    console.error('Error deleting custom tiles:', error);
+    throw error;
+  }
+}
