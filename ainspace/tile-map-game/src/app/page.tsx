@@ -51,20 +51,6 @@ export default function Home() {
         agentIds: agentsInRange.map(a => a.id)
       });
       
-      // Create new thread with unique ID
-      const threadId = `thread-${Date.now()}`;
-      const newThread = {
-        id: threadId,
-        message: messageText,
-        timestamp: new Date(),
-        agentsReached: agentsInRange.length,
-        agentNames: agentsInRange.map(agent => agent.name)
-      };
-      
-      // Add to threads list and set as current thread
-      setThreads(prev => [newThread, ...prev]);
-      setCurrentThreadId(threadId);
-      
       // Set broadcast status
       setBroadcastStatus({
         range: broadcastRange,
@@ -74,8 +60,22 @@ export default function Home() {
       
       setBroadcastMessage('');
       
-      // Send message through ChatBox system to get agent responses
+      // Only create thread and send message if there are agents in range
       if (agentsInRange.length > 0 && chatBoxRef.current) {
+        // Create new thread with unique ID
+        const threadId = `thread-${Date.now()}`;
+        const newThread = {
+          id: threadId,
+          message: messageText,
+          timestamp: new Date(),
+          agentsReached: agentsInRange.length,
+          agentNames: agentsInRange.map(agent => agent.name)
+        };
+        
+        // Add to threads list and set as current thread
+        setThreads(prev => [newThread, ...prev]);
+        setCurrentThreadId(threadId);
+        
         try {
           // Send the broadcast message through the ChatBox system with thread ID and radius
           await chatBoxRef.current.sendMessage(messageText, threadId, broadcastRange);
@@ -83,6 +83,8 @@ export default function Home() {
         } catch (error) {
           console.error('Failed to broadcast message:', error);
         }
+      } else {
+        console.log(`No agents in range - broadcast message "${messageText}" not sent, no thread created`);
       }
       
       // Clear broadcast status after 5 seconds
@@ -105,7 +107,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <div className={`mx-auto flex-1 flex flex-col ${activeTab === 'map' ? 'max-w-md' : 'max-w-2xl w-full px-4'}`}>
+      <div className="max-w-md mx-auto flex-1 flex flex-col">
         {/* Header */}
         <div className="bg-white p-4 shadow-sm">
           <h1 className="text-xl font-bold text-center text-gray-800">
