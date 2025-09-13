@@ -7,7 +7,13 @@ interface MapTabProps {
   playerPosition: { x: number; y: number };
   mapData: number[][];
   worldPosition: { x: number; y: number };
-  visibleAgents: any[];
+  visibleAgents: Array<{
+    id: string;
+    screenX: number;
+    screenY: number;
+    color: string;
+    name: string;
+  }>;
   publishedTiles: { [key: string]: string };
   customTiles: { [key: string]: string };
   isAutonomous: boolean;
@@ -28,7 +34,6 @@ interface MapTabProps {
     agentNames: string[];
   }[];
   onViewThread: (threadId?: string) => void;
-  worldPosition: { x: number; y: number };
   userId: string | null;
   isLoading: boolean;
   toggleAutonomous: () => void;
