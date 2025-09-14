@@ -80,7 +80,7 @@ export default function AgentTab({
 
   return (
     <BaseTabContent isActive={isActive}>
-      <div className="flex flex-col h-full w-full min-w-md">
+      <div className="flex flex-col h-full w-full max-w-full overflow-hidden">
         {/* Import Agent Section */}
         <div className="bg-purple-50 p-4 rounded-lg mb-4">
           <h3 className="text-lg font-semibold text-purple-800 mb-3">Import Agent</h3>
@@ -113,8 +113,8 @@ export default function AgentTab({
           <div className="mt-3 text-xs text-gray-600">
             <div className="font-medium mb-1">Example agent card JSON URLs:</div>
             <div className="space-y-1">
-              <div>• https://socratic-web3-ai-tutor.vercel.app/api/a2a/.well-known/agent.json</div>
-              <div>• http://localhost:4000/.well-known/agent-card.json</div>
+              <div className="break-all">• https://socratic-web3-ai-tutor.vercel.app/api/a2a/.well-known/agent.json</div>
+              <div className="break-all">• http://localhost:4000/.well-known/agent-card.json</div>
             </div>
           </div>
         </div>
@@ -130,17 +130,17 @@ export default function AgentTab({
           ) : (
             <div className="space-y-3">
               {agents.map((agent, index) => (
-                <div key={agent.url} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div key={agent.url} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm overflow-hidden">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900">{agent.card.name || `Agent ${index + 1}`}</h4>
                       {agent.card.description && (
-                        <p className="text-sm text-gray-600 mt-1">{agent.card.description}</p>
+                        <p className="text-sm text-gray-600 mt-1 break-words">{agent.card.description}</p>
                       )}
                       <div className="mt-2 space-y-1 text-xs text-gray-500">
                         <div>Version: {agent.card.version || 'N/A'}</div>
                         <div>Protocol: {agent.card.protocolVersion || 'N/A'}</div>
-                        <div>URL: <span className="text-blue-600">{agent.url}</span></div>
+                        <div>URL: <span className="text-blue-600 break-all">{agent.url}</span></div>
                         {agent.card.capabilities?.streaming && (
                           <div className="text-green-600">✓ Streaming supported</div>
                         )}
