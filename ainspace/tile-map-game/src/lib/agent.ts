@@ -10,6 +10,7 @@ export interface AgentState {
   direction?: 'up' | 'down' | 'left' | 'right';
   lastMoved?: number;
   moveInterval?: number;
+  agentUrl?: string; // For A2A agents
 }
 
 export interface Message {
@@ -54,7 +55,7 @@ export abstract class BaseAgent {
 
 
   // Abstract method for agent-specific message processing
-  protected abstract shouldRespondToMessage(): boolean;
+  protected abstract shouldRespondToMessage(message?: Message): boolean;
 
   // Add agent to a thread
   joinThread(threadId: string): void {
@@ -94,7 +95,7 @@ export abstract class BaseAgent {
       }
     } else {
       // For non-threaded messages, check if this agent should respond
-      if (!message.isMentioned && !this.shouldRespondToMessage()) {
+      if (!message.isMentioned && !this.shouldRespondToMessage(message)) {
         return null;
       }
     }
@@ -157,7 +158,7 @@ export class ExplorerAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(): boolean {
+  protected shouldRespondToMessage(message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
   }
@@ -168,7 +169,7 @@ export class PatrolAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(): boolean {
+  protected shouldRespondToMessage(message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
   }
@@ -179,9 +180,92 @@ export class WandererAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(): boolean {
+  protected shouldRespondToMessage(message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
+  }
+}
+
+// A2A Agent class - represents imported A2A protocol agents
+export class A2AAgent extends BaseAgent {
+  private agentUrl: string;
+
+  constructor(initialState: AgentState) {
+    super(initialState);
+    this.agentUrl = initialState.agentUrl || '';
+  }
+
+  updateState(newState: Partial<AgentState>): void {
+    super.updateState(newState);
+    if (newState.agentUrl !== undefined) {
+      this.agentUrl = newState.agentUrl;
+    }
+  }
+
+  async move(): Promise<void> {
+    // A2A agents are managed by the main application, not this system
+    // They have their own movement logic in the frontend
+    return;
+  }
+
+  async processMessage(message: Message): Promise<AgentResponse | null> {
+    if (!this.shouldRespondToMessage(message)) {
+      return null;
+    }
+
+    console.log(`A2A Agent ${this.name} processing message with agentUrl:`, this.agentUrl);
+
+    if (!this.agentUrl) {
+      console.error(`A2A Agent ${this.name} has no agentUrl configured`);
+      return null;
+    }
+
+    try {
+      const requestBody = {
+        agentUrl: this.agentUrl,
+        message: `[From player at (${message.playerPosition.x}, ${message.playerPosition.y})]: ${message.content}`,
+      };
+      
+      console.log(`Sending to agent-chat API:`, requestBody);
+      
+      // Send message to A2A agent through API
+      const response = await fetch('/api/agent-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.response && data.response !== 'Agent received your message but did not respond.') {
+          return {
+            agentId: this.id,
+            message: data.response,
+            timestamp: new Date(),
+            delay: Math.random() * 1000 + 500 // Random delay 0.5-1.5 seconds
+          };
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to send message to A2A agent ${this.name}:`, error);
+    }
+
+    return null;
+  }
+
+  protected shouldRespondToMessage(message: Message): boolean {
+    // A2A agents respond to messages within range
+    return message.distance <= 10; // Same as broadcast range
+  }
+
+  getAgentUrl(): string {
+    return this.agentUrl;
+  }
+
+  setAgentUrl(url: string): void {
+    this.agentUrl = url;
   }
 }
 
@@ -194,6 +278,8 @@ export function createAgent(type: string, initialState: AgentState): BaseAgent {
       return new PatrolAgent(initialState);
     case 'explorer':
       return new WandererAgent(initialState);
+    case 'A2A Agent':
+      return new A2AAgent(initialState);
     default:
       throw new Error(`Unknown agent type: ${type}`);
   }

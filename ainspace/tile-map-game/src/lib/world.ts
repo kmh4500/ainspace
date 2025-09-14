@@ -7,6 +7,7 @@ export interface Agent {
   x: number;
   y: number;
   behavior: string;
+  agentUrl?: string; // For A2A agents
 }
 
 export interface Player {
@@ -51,7 +52,8 @@ export class World {
         color: agent.color,
         x: agent.x,
         y: agent.y,
-        behavior: agent.behavior
+        behavior: agent.behavior,
+        agentUrl: agent.agentUrl // Include agentUrl for A2A agents
       };
       return createAgent(agent.behavior, agentState);
     });
@@ -75,7 +77,8 @@ export class World {
           y: agent.y,
           color: agent.color,
           name: agent.name,
-          behavior: agent.behavior
+          behavior: agent.behavior,
+          agentUrl: agent.agentUrl // Include agentUrl in update
         });
         return existingInstance;
       } else {
@@ -86,7 +89,8 @@ export class World {
           color: agent.color,
           x: agent.x,
           y: agent.y,
-          behavior: agent.behavior
+          behavior: agent.behavior,
+          agentUrl: agent.agentUrl // Include agentUrl for A2A agents
         };
         return createAgent(agent.behavior, agentState);
       }

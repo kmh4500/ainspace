@@ -7,7 +7,13 @@ interface BuildTabProps {
   mapData: number[][];
   playerPosition: { x: number; y: number };
   worldPosition: { x: number; y: number };
-  visibleAgents: any[];
+  visibleAgents: Array<{
+    id: string;
+    screenX: number;
+    screenY: number;
+    color: string;
+    name: string;
+  }>;
   publishedTiles: { [key: string]: string };
   customTiles: { [key: string]: string };
   selectedImage: string | null;

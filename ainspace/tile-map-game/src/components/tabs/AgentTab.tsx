@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
 import { AgentCard } from '@a2a-js/sdk';
-import { A2AClient } from '@a2a-js/sdk/client';
 import BaseTabContent from './BaseTabContent';
-
-interface AgentTabProps {
-  isActive: boolean;
-}
 
 interface ImportedAgent {
   url: string;
   card: AgentCard;
 }
 
-export default function AgentTab({ isActive }: AgentTabProps) {
+interface AgentTabProps {
+  isActive: boolean;
+  onSpawnAgent: (agent: ImportedAgent) => void;
+  onRemoveAgentFromMap: (agentUrl: string) => void;
+  spawnedAgents: string[]; // URLs of spawned agents
+}
+
+export default function AgentTab({ 
+  isActive, 
+  onSpawnAgent, 
+  onRemoveAgentFromMap,
+  spawnedAgents 
+}: AgentTabProps) {
   const [agentUrl, setAgentUrl] = useState('');
   const [agents, setAgents] = useState<ImportedAgent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -157,13 +164,33 @@ export default function AgentTab({ isActive }: AgentTabProps) {
                       )}
                     </div>
                     
-                    <button
-                      onClick={() => handleRemoveAgent(agent.url)}
-                      className="ml-4 text-red-500 hover:text-red-700 transition-colors"
-                      title="Remove agent"
-                    >
-                      ✕
-                    </button>
+                    <div className="ml-4 flex space-x-2">
+                      {spawnedAgents.includes(agent.url) ? (
+                        <button
+                          onClick={() => onRemoveAgentFromMap(agent.url)}
+                          className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                          title="Remove from map"
+                        >
+                          Remove from Map
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onSpawnAgent(agent)}
+                          className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
+                          title="Spawn on map"
+                        >
+                          Spawn on Map
+                        </button>
+                      )}
+                      
+                      <button
+                        onClick={() => handleRemoveAgent(agent.url)}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                        title="Remove agent completely"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

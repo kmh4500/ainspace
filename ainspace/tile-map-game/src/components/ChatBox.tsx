@@ -139,13 +139,6 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
     ? messages.filter(msg => msg.threadId === currentThreadId)
     : messages.filter(msg => !msg.threadId);
     
-  console.log('Thread filtering:', {
-    currentThreadId,
-    totalMessages: messages.length,
-    threadMessages: threadMessages.length,
-    messagesWithThread: messages.filter(m => m.threadId).length
-  });
-
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (showSuggestions && filteredAgents.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -238,7 +231,10 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
   }, [inputValue, cursorPosition]);
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Use consistent 24-hour format to avoid hydration mismatches
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
   return (

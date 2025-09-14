@@ -9,7 +9,7 @@ import BuildTab from '@/components/tabs/BuildTab';
 import AgentTab from '@/components/tabs/AgentTab';
 
 export default function Home() {
-  const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, agents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
+  const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
   const [activeTab, setActiveTab] = useState<'map' | 'thread' | 'build' | 'agent'>('map');
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [threads, setThreads] = useState<{
@@ -43,6 +43,19 @@ export default function Home() {
   } | null>(null);
   const [publishedTiles, setPublishedTiles] = useState<{
     [key: string]: string;
+  }>({});
+
+  // A2A Agent management state
+  const [spawnedA2AAgents, setSpawnedA2AAgents] = useState<{
+    [agentUrl: string]: {
+      id: string;
+      name: string;
+      x: number;
+      y: number;
+      color: string;
+      agentUrl: string;
+      lastMoved: number;
+    };
   }>({});
 
   // Load custom tiles when userId is available
@@ -79,16 +92,16 @@ export default function Home() {
       
       // Calculate agents within range (default broadcast range: 10 units)
       const broadcastRange = 10;
-      const agentsInRange = worldAgents.filter(agent => {
+      const agentsInRange = combinedWorldAgents.filter(agent => {
         const distance = Math.sqrt(
           Math.pow(agent.x - worldPosition.x, 2) + 
           Math.pow(agent.y - worldPosition.y, 2)
         );
         return distance <= broadcastRange;
       });
-      
+
       console.log('Broadcast setup:', {
-        totalAgents: worldAgents.length,
+        totalAgents: combinedWorldAgents.length,
         agentsInRange: agentsInRange.length,
         agentNames: agentsInRange.map(a => a.name),
         agentIds: agentsInRange.map(a => a.id)
@@ -103,7 +116,7 @@ export default function Home() {
       
       setBroadcastMessage('');
       
-      // Only create thread and send message if there are agents in range
+      // Create thread and send message if there are agents in range
       if (agentsInRange.length > 0 && chatBoxRef.current) {
         // Create new thread with unique ID
         const threadId = `thread-${Date.now()}`;
@@ -121,6 +134,7 @@ export default function Home() {
         
         try {
           // Send the broadcast message through the ChatBox system with thread ID and radius
+          // This now handles both regular and A2A agents through the unified system
           await chatBoxRef.current.sendMessage(messageText, threadId, broadcastRange);
           console.log(`Broadcasting "${messageText}" to ${agentsInRange.length} agents in thread ${threadId}:`, agentsInRange.map(a => a.name));
         } catch (error) {
@@ -210,6 +224,117 @@ export default function Home() {
     }
   };
 
+  // A2A Agent handlers - now integrated into worldAgents
+  const handleSpawnAgent = (importedAgent: { url: string; card: { name?: string } }) => {
+    const agentId = `a2a-${Date.now()}`;
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    
+    // Spawn near player position
+    const spawnX = worldPosition.x + Math.floor(Math.random() * 6) - 3;
+    const spawnY = worldPosition.y + Math.floor(Math.random() * 6) - 3;
+
+    // Add to spawned A2A agents for UI tracking
+    setSpawnedA2AAgents(prev => ({
+      ...prev,
+      [importedAgent.url]: {
+        id: agentId,
+        name: importedAgent.card.name || 'A2A Agent',
+        x: spawnX,
+        y: spawnY,
+        color: randomColor,
+        agentUrl: importedAgent.url,
+        lastMoved: Date.now()
+      }
+    }));
+  };
+
+  const handleRemoveAgentFromMap = (agentUrl: string) => {
+    setSpawnedA2AAgents(prev => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [agentUrl]: removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  // Combine existing world agents with spawned A2A agents
+  const combinedWorldAgents = [
+    ...worldAgents,
+    ...Object.values(spawnedA2AAgents).map(agent => ({
+      id: agent.id,
+      x: agent.x,
+      y: agent.y,
+      color: agent.color,
+      name: agent.name,
+      behavior: 'A2A Agent',
+      agentUrl: agent.agentUrl // Include agentUrl for A2A agents
+    }))
+  ];
+
+  // Convert A2A agents to visible agents format for the map
+  const a2aVisibleAgents = Object.values(spawnedA2AAgents)
+    .map(agent => {
+      const screenX = agent.x - worldPosition.x + Math.floor(mapData[0]?.length / 2);
+      const screenY = agent.y - worldPosition.y + Math.floor(mapData.length / 2);
+      
+      // Only show if within visible area
+      if (screenX >= 0 && screenX < mapData[0]?.length && screenY >= 0 && screenY < mapData.length) {
+        return {
+          id: agent.id,
+          screenX,
+          screenY,
+          color: agent.color,
+          name: agent.name
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as Array<{
+      id: string;
+      screenX: number;
+      screenY: number;
+      color: string;
+      name: string;
+    }>;
+
+  const combinedVisibleAgents = [...visibleAgents, ...a2aVisibleAgents];
+
+  // A2A Agent movement system
+  useEffect(() => {
+    const moveA2AAgents = () => {
+      setSpawnedA2AAgents(prev => {
+        const now = Date.now();
+        const updated = { ...prev };
+        
+        Object.values(updated).forEach(agent => {
+          // Move agents every 5-10 seconds randomly
+          if (now - agent.lastMoved > 5000 + Math.random() * 5000) {
+            const directions = [
+              { dx: 0, dy: -1 }, // up
+              { dx: 0, dy: 1 },  // down
+              { dx: -1, dy: 0 }, // left
+              { dx: 1, dy: 0 },  // right
+            ];
+            
+            const direction = directions[Math.floor(Math.random() * directions.length)];
+            const newX = agent.x + direction.dx;
+            const newY = agent.y + direction.dy;
+            
+            // Simple boundary check (agents can move anywhere)
+            agent.x = newX;
+            agent.y = newY;
+            agent.lastMoved = now;
+          }
+        });
+        
+        return updated;
+      });
+    };
+
+    const interval = setInterval(moveA2AAgents, 2000); // Check every 2 seconds
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="max-w-md mx-auto flex-1 flex flex-col">
@@ -273,7 +398,7 @@ export default function Home() {
             playerPosition={playerPosition}
             mapData={mapData}
             worldPosition={worldPosition}
-            visibleAgents={visibleAgents}
+            visibleAgents={combinedVisibleAgents}
             publishedTiles={publishedTiles}
             customTiles={customTiles}
             isAutonomous={isAutonomous}
@@ -293,7 +418,7 @@ export default function Home() {
             isActive={activeTab === 'thread'}
             chatBoxRef={chatBoxRef}
             lastCommentary={lastCommentary}
-            worldAgents={worldAgents}
+            worldAgents={combinedWorldAgents}
             worldPosition={worldPosition}
             currentThreadId={currentThreadId || undefined}
             threads={threads}
@@ -305,7 +430,7 @@ export default function Home() {
             mapData={mapData}
             playerPosition={playerPosition}
             worldPosition={worldPosition}
-            visibleAgents={visibleAgents}
+            visibleAgents={combinedVisibleAgents}
             publishedTiles={publishedTiles}
             customTiles={customTiles}
             selectedImage={selectedImage}
@@ -323,6 +448,9 @@ export default function Home() {
           
           <AgentTab
             isActive={activeTab === 'agent'}
+            onSpawnAgent={handleSpawnAgent}
+            onRemoveAgentFromMap={handleRemoveAgentFromMap}
+            spawnedAgents={Object.keys(spawnedA2AAgents)}
           />
         </div>
       </div>

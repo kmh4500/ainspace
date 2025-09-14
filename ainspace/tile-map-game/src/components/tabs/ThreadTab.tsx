@@ -4,9 +4,16 @@ import BaseTabContent from './BaseTabContent';
 
 interface ThreadTabProps {
   isActive: boolean;
-  chatBoxRef: React.RefObject<ChatBoxRef>;
+  chatBoxRef: React.RefObject<ChatBoxRef | null>;
   lastCommentary: string;
-  worldAgents: any[];
+  worldAgents: Array<{
+    id: string;
+    x: number;
+    y: number;
+    color: string;
+    name: string;
+    behavior: string;
+  }>;
   worldPosition: { x: number; y: number };
   currentThreadId?: string;
   threads: {
