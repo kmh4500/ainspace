@@ -28,9 +28,17 @@ export default function Home() {
   const chatBoxRef = useRef<ChatBoxRef>(null);
   
   // Build mode state
-  const [customTiles, setCustomTiles] = useState<{
-    [key: string]: string; // key: "x,y", value: image data URL
-  }>({});
+  type TileLayers = {
+    layer0: { [key: string]: string };
+    layer1: { [key: string]: string };
+    layer2: { [key: string]: string };
+  };
+
+  const [customTiles, setCustomTiles] = useState<TileLayers>({
+    layer0: {},
+    layer1: {},
+    layer2: {}
+  });
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [buildMode, setBuildMode] = useState<'select' | 'paint'>('select');
   const [registeredImages, setRegisteredImages] = useState<{
@@ -41,9 +49,11 @@ export default function Home() {
     type: 'success' | 'error';
     message: string;
   } | null>(null);
-  const [publishedTiles, setPublishedTiles] = useState<{
-    [key: string]: string;
-  }>({});
+  const [publishedTiles, setPublishedTiles] = useState<TileLayers>({
+    layer0: {},
+    layer1: {},
+    layer2: {}
+  });
 
   // A2A Agent management state
   const [spawnedA2AAgents, setSpawnedA2AAgents] = useState<{
@@ -67,9 +77,12 @@ export default function Home() {
         const response = await fetch(`/api/custom-tiles?userId=${userId}`);
         if (response.ok) {
           const data = await response.json();
-          if (!data.isDefault && Object.keys(data.tiles).length > 0) {
+          if (!data.isDefault && data.tiles) {
             setPublishedTiles(data.tiles);
-            console.log(`Loaded ${Object.keys(data.tiles).length} published tiles from server`);
+            const totalTiles = Object.keys(data.tiles.layer0 || {}).length + 
+                              Object.keys(data.tiles.layer1 || {}).length + 
+                              Object.keys(data.tiles.layer2 || {}).length;
+            console.log(`Loaded ${totalTiles} published tiles from server`);
           }
         }
       } catch (error) {
@@ -163,7 +176,11 @@ export default function Home() {
   };
 
   const handlePublishTiles = async () => {
-    if (!userId || Object.keys(customTiles).length === 0) {
+    const totalCustomTiles = Object.keys(customTiles.layer0 || {}).length + 
+                            Object.keys(customTiles.layer1 || {}).length + 
+                            Object.keys(customTiles.layer2 || {}).length;
+    
+    if (!userId || totalCustomTiles === 0) {
       setPublishStatus({
         type: 'error',
         message: 'No custom tiles to publish'
@@ -197,8 +214,12 @@ export default function Home() {
       });
 
       // Move custom tiles to published tiles and reset build state
-      setPublishedTiles(prev => ({ ...prev, ...customTiles }));
-      setCustomTiles({}); // Clear draft tiles since they're now published
+      setPublishedTiles(prev => ({
+        layer0: { ...(prev.layer0 || {}), ...(customTiles.layer0 || {}) },
+        layer1: { ...(prev.layer1 || {}), ...(customTiles.layer1 || {}) },
+        layer2: { ...(prev.layer2 || {}), ...(customTiles.layer2 || {}) }
+      }));
+      setCustomTiles({ layer0: {}, layer1: {}, layer2: {} }); // Clear draft tiles since they're now published
       setSelectedImage(null);
       setBuildMode('select');
       // Note: Don't clear registeredImages - they should persist

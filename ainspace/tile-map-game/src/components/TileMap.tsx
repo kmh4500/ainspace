@@ -41,6 +41,8 @@ export default function TileMap({
 }: TileMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loadedImages, setLoadedImages] = useState<{ [key: string]: HTMLImageElement }>({});
+  const [isPainting, setIsPainting] = useState(false);
+  const [lastPaintedTile, setLastPaintedTile] = useState<{ x: number; y: number } | null>(null);
 
   // Check if customTiles is using layer structure
   const isLayeredTiles = (tiles: any): tiles is TileLayers => {
@@ -80,18 +82,16 @@ export default function TileMap({
     });
   }, [customTiles, loadedImages]);
 
-  // Handle canvas click for build mode
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (buildMode !== 'paint' || !onTileClick) return;
-    
+  // Convert mouse event to world coordinates
+  const getWorldCoordinatesFromEvent = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     
-    // Get click position relative to canvas, accounting for scaling
+    // Get position relative to canvas, accounting for scaling
     const canvasX = (event.clientX - rect.left) * scaleX;
     const canvasY = (event.clientY - rect.top) * scaleY;
     
@@ -99,7 +99,7 @@ export default function TileMap({
     const screenX = Math.floor(canvasX / tileSize);
     const screenY = Math.floor(canvasY / tileSize);
     
-    // Check if click is within map bounds
+    // Check if position is within map bounds
     if (screenX >= 0 && screenX < mapData[0]?.length && screenY >= 0 && screenY < mapData.length) {
       // Convert screen coordinates to world coordinates
       const halfWidth = Math.floor(mapData[0]?.length / 2);
@@ -107,8 +107,56 @@ export default function TileMap({
       const worldX = worldPosition.x - halfWidth + screenX;
       const worldY = worldPosition.y - halfHeight + screenY;
       
-      onTileClick(worldX, worldY);
+      return { worldX, worldY };
     }
+    
+    return null;
+  };
+
+  // Handle painting at specific coordinates
+  const paintTileAt = (worldX: number, worldY: number) => {
+    if (!onTileClick) return;
+    
+    // Avoid painting the same tile twice in a row during drag
+    if (lastPaintedTile && lastPaintedTile.x === worldX && lastPaintedTile.y === worldY) {
+      return;
+    }
+    
+    setLastPaintedTile({ x: worldX, y: worldY });
+    onTileClick(worldX, worldY);
+  };
+
+  // Handle mouse down - start painting
+  const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (buildMode !== 'paint') return;
+    
+    const coords = getWorldCoordinatesFromEvent(event);
+    if (coords) {
+      setIsPainting(true);
+      paintTileAt(coords.worldX, coords.worldY);
+    }
+  };
+
+  // Handle mouse move - continue painting if dragging
+  const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (buildMode !== 'paint' || !isPainting) return;
+    
+    const coords = getWorldCoordinatesFromEvent(event);
+    if (coords) {
+      paintTileAt(coords.worldX, coords.worldY);
+    }
+  };
+
+  // Handle mouse up - stop painting
+  const handleMouseUp = () => {
+    setIsPainting(false);
+    setLastPaintedTile(null);
+  };
+
+  // Handle mouse leave - stop painting when leaving canvas
+  const handleMouseLeave = () => {
+    setIsPainting(false);
+    setLastPaintedTile(null);
   };
 
   useEffect(() => {
@@ -253,7 +301,10 @@ export default function TileMap({
         background: '#f0f8ff',
         cursor: buildMode === 'paint' ? 'crosshair' : 'default'
       }}
-      onClick={handleCanvasClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
     />
   );
 }

@@ -14,8 +14,16 @@ interface MapTabProps {
     color: string;
     name: string;
   }>;
-  publishedTiles: { [key: string]: string };
-  customTiles: { [key: string]: string };
+  publishedTiles: {
+    layer0: { [key: string]: string };
+    layer1: { [key: string]: string };
+    layer2: { [key: string]: string };
+  };
+  customTiles: {
+    layer0: { [key: string]: string };
+    layer1: { [key: string]: string };
+    layer2: { [key: string]: string };
+  };
   isAutonomous: boolean;
   onMobileMove: (direction: 'up' | 'down' | 'left' | 'right') => void;
   broadcastMessage: string;
@@ -70,7 +78,12 @@ export default function MapTab({
             playerPosition={playerPosition}
             worldPosition={worldPosition}
             agents={visibleAgents}
-            customTiles={{ ...publishedTiles, ...customTiles }}
+            customTiles={{
+              layer0: { ...(publishedTiles.layer0 || {}), ...(customTiles.layer0 || {}) },
+              layer1: { ...(publishedTiles.layer1 || {}), ...(customTiles.layer1 || {}) },
+              layer2: { ...(publishedTiles.layer2 || {}), ...(customTiles.layer2 || {}) }
+            }}
+            layerVisibility={{ 0: true, 1: true, 2: true }}
           />
         </div>
         

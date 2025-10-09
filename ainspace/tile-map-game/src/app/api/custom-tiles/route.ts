@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveCustomTiles, getCustomTiles } from '@/lib/redis';
+import { saveCustomTiles, getCustomTiles, TileLayers } from '@/lib/redis';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
     if (!customTilesData) {
       // Return empty tiles if no saved data
       return NextResponse.json({
-        tiles: {},
+        tiles: {
+          layer0: {},
+          layer1: {},
+          layer2: {}
+        },
         lastUpdated: new Date().toISOString(),
         isDefault: true
       });
@@ -50,11 +54,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await saveCustomTiles(userId, customTiles);
+    // Validate TileLayers structure
+    const tileLayers = customTiles as TileLayers;
+    if (!tileLayers.layer0 && !tileLayers.layer1 && !tileLayers.layer2) {
+      return NextResponse.json(
+        { error: 'Invalid tiles structure. Expected layer0, layer1, layer2 properties' },
+        { status: 400 }
+      );
+    }
+
+    await saveCustomTiles(userId, tileLayers);
+
+    // Count total tiles across all layers
+    const tileCount = Object.keys(tileLayers.layer0 || {}).length + 
+                     Object.keys(tileLayers.layer1 || {}).length + 
+                     Object.keys(tileLayers.layer2 || {}).length;
 
     return NextResponse.json({
       success: true,
-      tileCount: Object.keys(customTiles).length,
+      tileCount,
       savedAt: new Date().toISOString()
     });
   } catch (error) {

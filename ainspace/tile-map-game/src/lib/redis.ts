@@ -8,14 +8,19 @@ client.on('error', (err) => {
   console.error('Redis Client Error', err);
 });
 
-let isConnected = false;
-
 export async function getRedisClient() {
-  if (!isConnected) {
-    await client.connect();
-    isConnected = true;
+  try {
+    if (!client.isOpen) {
+      await client.connect();
+    }
+    return client;
+  } catch (error: any) {
+    // If already connected, ignore the error and return client
+    if (error.message?.includes('Socket already opened') || error.message?.includes('already connected')) {
+      return client;
+    }
+    throw error;
   }
-  return client;
 }
 
 export interface PlayerPosition {
@@ -75,45 +80,128 @@ export async function deletePlayerPosition(userId: string): Promise<void> {
   }
 }
 
+export type TileLayers = {
+  layer0: { [key: string]: string };
+  layer1: { [key: string]: string };
+  layer2: { [key: string]: string };
+};
+
 export interface CustomTilesData {
-  tiles: { [key: string]: string };
+  tiles: TileLayers;
   lastUpdated: string;
 }
 
-export async function saveCustomTiles(userId: string, customTiles: { [key: string]: string }): Promise<void> {
+export async function saveCustomTiles(userId: string, customTiles: TileLayers): Promise<void> {
   try {
     const redis = await getRedisClient();
-    const customTilesData: CustomTilesData = {
-      tiles: customTiles,
+    
+    // Get existing global tiles directly
+    const globalTilesData = await redis.hGetAll('global-tiles');
+    let existingTiles: TileLayers = { layer0: {}, layer1: {}, layer2: {} };
+    
+    if (globalTilesData && Object.keys(globalTilesData).length > 0) {
+      const parsedTiles = JSON.parse(globalTilesData.tiles || '{}');
+      existingTiles = {
+        layer0: parsedTiles.layer0 || {},
+        layer1: parsedTiles.layer1 || {},
+        layer2: parsedTiles.layer2 || {}
+      };
+    }
+    
+    // Merge new tiles with existing ones (new tiles take precedence)
+    const mergedTiles: TileLayers = {
+      layer0: { ...(existingTiles.layer0 || {}), ...(customTiles.layer0 || {}) },
+      layer1: { ...(existingTiles.layer1 || {}), ...(customTiles.layer1 || {}) },
+      layer2: { ...(existingTiles.layer2 || {}), ...(customTiles.layer2 || {}) }
+    };
+    
+    const newGlobalTilesData: CustomTilesData = {
+      tiles: mergedTiles,
       lastUpdated: new Date().toISOString()
     };
     
-    await redis.hSet(`custom-tiles:${userId}`, {
-      tiles: JSON.stringify(customTilesData.tiles),
-      lastUpdated: customTilesData.lastUpdated
+    // Save to global key (no userId)
+    await redis.hSet('global-tiles', {
+      tiles: JSON.stringify(newGlobalTilesData.tiles),
+      lastUpdated: newGlobalTilesData.lastUpdated
     });
-    await redis.expire(`custom-tiles:${userId}`, 86400 * 7); // Expire after 7 days
+    // No expiration for global tiles - they persist forever
   } catch (error) {
     console.error('Error saving custom tiles:', error);
     throw error;
   }
 }
 
+// Get global tiles (for backward compatibility, still accepts userId but ignores it)
 export async function getCustomTiles(userId: string): Promise<CustomTilesData | null> {
   try {
     const redis = await getRedisClient();
-    const customTilesData = await redis.hGetAll(`custom-tiles:${userId}`);
+    const globalTilesData = await redis.hGetAll('global-tiles');
     
-    if (!customTilesData || Object.keys(customTilesData).length === 0) {
+    if (!globalTilesData || Object.keys(globalTilesData).length === 0) {
       return null;
     }
     
+    const parsedTiles = JSON.parse(globalTilesData.tiles || '{}');
+    
+    // Handle legacy single-layer format and convert to multi-layer
+    if (!parsedTiles.layer0 && !parsedTiles.layer1 && !parsedTiles.layer2) {
+      // Legacy format - move all tiles to layer0
+      return {
+        tiles: {
+          layer0: parsedTiles,
+          layer1: {},
+          layer2: {}
+        },
+        lastUpdated: globalTilesData.lastUpdated || new Date().toISOString()
+      };
+    }
+    
+    // Modern multi-layer format
     return {
-      tiles: JSON.parse(customTilesData.tiles || '{}'),
-      lastUpdated: customTilesData.lastUpdated || new Date().toISOString()
+      tiles: {
+        layer0: parsedTiles.layer0 || {},
+        layer1: parsedTiles.layer1 || {},
+        layer2: parsedTiles.layer2 || {}
+      },
+      lastUpdated: globalTilesData.lastUpdated || new Date().toISOString()
     };
   } catch (error) {
-    console.error('Error getting custom tiles:', error);
+    console.error('Error getting global tiles:', error);
+    return null;
+  }
+}
+
+// New function to get global tiles
+export async function getGlobalTiles(): Promise<TileLayers | null> {
+  try {
+    const redis = await getRedisClient();
+    const globalTilesData = await redis.hGetAll('global-tiles');
+    
+    if (!globalTilesData || Object.keys(globalTilesData).length === 0) {
+      return null;
+    }
+    
+    const parsedTiles = JSON.parse(globalTilesData.tiles || '{}');
+    
+    // Handle legacy single-layer format and convert to multi-layer
+    if (!parsedTiles.layer0 && !parsedTiles.layer1 && !parsedTiles.layer2) {
+      // Legacy format - move all tiles to layer0
+      return {
+        layer0: parsedTiles,
+        layer1: {},
+        layer2: {}
+      };
+    }
+    
+    // Modern multi-layer format
+    return {
+      layer0: parsedTiles.layer0 || {},
+      layer1: parsedTiles.layer1 || {},
+      layer2: parsedTiles.layer2 || {}
+    };
+  } catch (error) {
+    console.error('Error getting global tiles:', error);
     return null;
   }
 }
