@@ -42,16 +42,12 @@ export function MapDataProvider({ children }: MapDataProviderProps) {
       if (random < 0.7) return 1; // Dirt path
     }
     
-    // Generate structures
-    if (x % 25 === 12 && y % 25 === 12) {
-      return 3; // Stone structure
-    }
+    // Generate structures - removed stone structures for free movement
     
-    // Generate terrain based on biome
+    // Generate terrain based on biome - removed stone tiles for free movement
     switch (biomeType) {
       case 1: // Desert biome
-        if (random < 0.1) return 3; // Stone
-        if (random < 0.3) return 1; // Dirt
+        if (random < 0.4) return 1; // Dirt
         return 0; // Grass (sandy grass)
         
       case 2: // Water biome
@@ -59,13 +55,11 @@ export function MapDataProvider({ children }: MapDataProviderProps) {
         if (random < 0.8) return 0; // Grass
         return 1; // Dirt
         
-      case 3: // Mountain biome
-        if (random < 0.4) return 3; // Stone
+      case 3: // Mountain biome (now without stone obstacles)
         if (random < 0.7) return 1; // Dirt
         return 0; // Grass
         
       default: // Plains biome
-        if (random < 0.05) return 3; // Stone
         if (random < 0.15) return 1; // Dirt
         if (random < 0.25) return 2; // Water
         return 0; // Grass

@@ -10,13 +10,20 @@ interface Agent {
   name: string;
 }
 
+type TileLayers = {
+  layer0: { [key: string]: string };
+  layer1: { [key: string]: string };
+  layer2: { [key: string]: string };
+};
+
 interface TileMapProps {
   mapData: number[][];
   tileSize: number;
   playerPosition: { x: number; y: number };
   worldPosition: { x: number; y: number };
   agents?: Agent[];
-  customTiles?: { [key: string]: string };
+  customTiles?: TileLayers | { [key: string]: string };
+  layerVisibility?: { [key: number]: boolean };
   buildMode?: 'view' | 'paint';
   onTileClick?: (x: number, y: number) => void;
 }
@@ -28,15 +35,35 @@ export default function TileMap({
   worldPosition,
   agents = [],
   customTiles = {},
+  layerVisibility = { 0: true, 1: true, 2: true },
   buildMode = 'view',
   onTileClick
 }: TileMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loadedImages, setLoadedImages] = useState<{ [key: string]: HTMLImageElement }>({});
 
+  // Check if customTiles is using layer structure
+  const isLayeredTiles = (tiles: any): tiles is TileLayers => {
+    return tiles && typeof tiles === 'object' && ('layer0' in tiles || 'layer1' in tiles || 'layer2' in tiles);
+  };
+
   // Load custom tile images
   useEffect(() => {
-    const imagesToLoad = Object.values(customTiles);
+    let imagesToLoad: string[] = [];
+    
+    if (isLayeredTiles(customTiles)) {
+      // Extract images from all layers
+      Object.keys(customTiles).forEach(layerKey => {
+        const layer = customTiles[layerKey as keyof TileLayers];
+        if (layer) {
+          imagesToLoad.push(...Object.values(layer));
+        }
+      });
+    } else {
+      // Legacy single layer support
+      imagesToLoad = Object.values(customTiles);
+    }
+    
     const uniqueImages = [...new Set(imagesToLoad)];
     
     uniqueImages.forEach(imageUrl => {
@@ -95,24 +122,9 @@ export default function TileMap({
     ctx.fillStyle = '#f0f8ff'; // Light blue-white background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw tiles
+    // Draw base tiles
     for (let y = 0; y < mapData.length; y++) {
       for (let x = 0; x < mapData[y].length; x++) {
-        // Convert screen coordinates to world coordinates for custom tile lookup
-        const halfWidth = Math.floor(mapData[0]?.length / 2);
-        const halfHeight = Math.floor(mapData.length / 2);
-        const worldX = worldPosition.x - halfWidth + x;
-        const worldY = worldPosition.y - halfHeight + y;
-        const tileKey = `${worldX},${worldY}`;
-        const customTileImage = customTiles[tileKey];
-        
-        // Check if this tile has a custom image
-        if (customTileImage && loadedImages[customTileImage]) {
-          const img = loadedImages[customTileImage];
-          ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
-          continue;
-        }
-        
         const tileType = mapData[y][x];
         
         // Render void tiles as light background
@@ -141,6 +153,51 @@ export default function TileMap({
         }
 
         ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+      }
+    }
+    
+    // Draw custom tile layers
+    const halfWidth = Math.floor(mapData[0]?.length / 2);
+    const halfHeight = Math.floor(mapData.length / 2);
+    
+    if (isLayeredTiles(customTiles)) {
+      // Draw each layer in order
+      [0, 1, 2].forEach(layerIndex => {
+        if (!layerVisibility[layerIndex]) return;
+        
+        const layerKey = `layer${layerIndex}` as keyof TileLayers;
+        const layer = customTiles[layerKey];
+        
+        if (layer) {
+          for (let y = 0; y < mapData.length; y++) {
+            for (let x = 0; x < mapData[y].length; x++) {
+              const worldX = worldPosition.x - halfWidth + x;
+              const worldY = worldPosition.y - halfHeight + y;
+              const tileKey = `${worldX},${worldY}`;
+              const customTileImage = layer[tileKey];
+              
+              if (customTileImage && loadedImages[customTileImage]) {
+                const img = loadedImages[customTileImage];
+                ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // Legacy single layer rendering
+      for (let y = 0; y < mapData.length; y++) {
+        for (let x = 0; x < mapData[y].length; x++) {
+          const worldX = worldPosition.x - halfWidth + x;
+          const worldY = worldPosition.y - halfHeight + y;
+          const tileKey = `${worldX},${worldY}`;
+          const customTileImage = customTiles[tileKey];
+          
+          if (customTileImage && loadedImages[customTileImage]) {
+            const img = loadedImages[customTileImage];
+            ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
+          }
+        }
       }
     }
 
@@ -184,7 +241,7 @@ export default function TileMap({
       tileSize - 4
     );
 
-  }, [mapData, tileSize, playerPosition, agents, customTiles, loadedImages]);
+  }, [mapData, tileSize, playerPosition, agents, customTiles, loadedImages, layerVisibility]);
 
   return (
     <canvas
