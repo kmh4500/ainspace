@@ -79,30 +79,57 @@ export default function BuildTab({
   const imageRef = useRef<HTMLDivElement>(null);
   const imgElementRef = useRef<HTMLImageElement>(null);
 
+  // Helper function to upload tile to Vercel Blob
+  const uploadTileToBlob = async (dataUrl: string): Promise<string> => {
+    // Convert data URL to Blob
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+
+    // Create unique tile ID
+    const tileId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Upload to Vercel Blob
+    const formData = new FormData();
+    formData.append('file', blob, `${tileId}.png`);
+    formData.append('tileId', tileId);
+
+    const uploadResponse = await fetch('/api/upload-tile', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Failed to upload tile');
+    }
+
+    const { url } = await uploadResponse.json();
+    return url;
+  };
+
   // Extract tiles from tileset image with 16x16 tile size
-  const extractTilesFromTileset = (imageDataUrl: string) => {
+  const extractTilesFromTileset = async (imageDataUrl: string) => {
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
+
       // Calculate grid based on selected tile size
       const cols = Math.floor(img.width / tileSize);
       const rows = Math.floor(img.height / tileSize);
-      
+
       // Update grid state
       setTilesetGrid({ cols, rows });
-      
+
       const tileWidth = tileSize;
       const tileHeight = tileSize;
       const tiles: string[] = [];
-      
+
       canvas.width = tileWidth;
       canvas.height = tileHeight;
-      
+
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           ctx.clearRect(0, 0, tileWidth, tileHeight);
@@ -111,10 +138,20 @@ export default function BuildTab({
             col * tileWidth, row * tileHeight, tileWidth, tileHeight,
             0, 0, tileWidth, tileHeight
           );
-          tiles.push(canvas.toDataURL());
+
+          // Upload tile to Vercel Blob and get URL
+          try {
+            const dataUrl = canvas.toDataURL();
+            const blobUrl = await uploadTileToBlob(dataUrl);
+            tiles.push(blobUrl);
+          } catch (error) {
+            console.error('Failed to upload tile:', error);
+            // Fallback to data URL if upload fails
+            tiles.push(canvas.toDataURL());
+          }
         }
       }
-      
+
       setExtractedTiles(tiles);
     };
     img.src = imageDataUrl;
@@ -126,52 +163,61 @@ export default function BuildTab({
   };
 
   // Extract selected area as tiles
-  const extractSelectedTiles = () => {
+  const extractSelectedTiles = async () => {
     if (!selection || !tilesetImage) return;
-    
+
     const img = new Image();
-    img.onload = () => {
+    img.onload = async () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
+
       // Calculate tile dimensions based on selection
       const cols = selection.width / tileSize;
       const rows = selection.height / tileSize;
-      
+
       const tiles: string[] = [];
-      
+
       canvas.width = tileSize;
       canvas.height = tileSize;
-      
+
       // Extract each tile from the selection
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           ctx.clearRect(0, 0, tileSize, tileSize);
-          
+
           const sourceX = selection.x + col * tileSize;
           const sourceY = selection.y + row * tileSize;
-          
+
           // Draw the tile
           ctx.drawImage(
             img,
             sourceX, sourceY, tileSize, tileSize,
             0, 0, tileSize, tileSize
           );
-          
-          tiles.push(canvas.toDataURL());
+
+          // Upload tile to Vercel Blob and get URL
+          try {
+            const dataUrl = canvas.toDataURL();
+            const blobUrl = await uploadTileToBlob(dataUrl);
+            tiles.push(blobUrl);
+          } catch (error) {
+            console.error('Failed to upload tile:', error);
+            // Fallback to data URL if upload fails
+            tiles.push(canvas.toDataURL());
+          }
         }
       }
-      
+
       // Update selected tiles
       setSelectedTiles({
         tiles,
         width: cols,
         height: rows
       });
-      
+
       setBuildMode('paint');
     };
     img.src = tilesetImage;
