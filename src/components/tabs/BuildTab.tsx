@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import NextImage from 'next/image';
 import TileMap from '@/components/TileMap';
 import BaseTabContent from './BaseTabContent';
 
@@ -26,8 +27,6 @@ interface BuildTabProps {
   setSelectedImage: (image: string | null) => void;
   buildMode: 'select' | 'paint';
   setBuildMode: (mode: 'select' | 'paint') => void;
-  registeredImages: { [key: string]: string };
-  setRegisteredImages: (images: { [key: string]: string } | ((prev: { [key: string]: string }) => { [key: string]: string })) => void;
   setCustomTiles: (tiles: TileLayers | ((prev: TileLayers) => TileLayers)) => void;
   isPublishing: boolean;
   publishStatus: {
@@ -50,8 +49,6 @@ export default function BuildTab({
   setSelectedImage,
   buildMode,
   setBuildMode,
-  registeredImages,
-  setRegisteredImages,
   setCustomTiles,
   isPublishing,
   publishStatus,
@@ -59,7 +56,6 @@ export default function BuildTab({
   onPublishTiles
 }: BuildTabProps) {
   const [tilesetImage, setTilesetImage] = useState<string | null>(null);
-  const [tilesetGrid, setTilesetGrid] = useState<{ cols: number; rows: number }>({ cols: 8, rows: 8 });
   const [extractedTiles, setExtractedTiles] = useState<string[]>([]);
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | null>(null);
   const [selectedTiles, setSelectedTiles] = useState<{
@@ -119,9 +115,6 @@ export default function BuildTab({
       // Calculate grid based on selected tile size
       const cols = Math.floor(img.width / tileSize);
       const rows = Math.floor(img.height / tileSize);
-
-      // Update grid state
-      setTilesetGrid({ cols, rows });
 
       const tileWidth = tileSize;
       const tileHeight = tileSize;
@@ -309,12 +302,14 @@ export default function BuildTab({
     if (tilesetImage) {
       extractTilesFromTileset(tilesetImage);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tilesetImage, tileSize]);
 
   useEffect(() => {
     if (selection) {
       extractSelectedTiles();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection]);
 
   return (
@@ -432,10 +427,11 @@ export default function BuildTab({
                       }
                     }}
                   >
-                    <img 
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       ref={imgElementRef}
-                      src={tilesetImage} 
-                      alt="Tileset" 
+                      src={tilesetImage}
+                      alt="Tileset"
                       className="block"
                       draggable={false}
                       style={{ userSelect: 'none' }}
@@ -525,10 +521,12 @@ export default function BuildTab({
                 ) : selectedImage && (
                   <>
                     <div className="w-6 h-6 border border-orange-300 rounded overflow-hidden flex-shrink-0">
-                      <img 
-                        src={selectedImage} 
-                        alt="Selected" 
-                        className="w-full h-full object-cover"
+                      <NextImage
+                        src={selectedImage}
+                        alt="Selected"
+                        width={24}
+                        height={24}
+                        className="object-cover"
                       />
                     </div>
                     <div className="flex-1">

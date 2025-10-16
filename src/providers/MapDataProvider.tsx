@@ -2,11 +2,6 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 
-interface Position {
-  x: number;
-  y: number;
-}
-
 interface MapDataContextType {
   getMapData: (centerX: number, centerY: number, width: number, height: number) => number[][];
   getCircularMapData: (centerX: number, centerY: number, radius: number, width: number, height: number) => number[][];

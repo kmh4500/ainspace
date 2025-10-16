@@ -289,7 +289,7 @@ export default function TileMap({
       tileSize - 4
     );
 
-  }, [mapData, tileSize, playerPosition, agents, customTiles, loadedImages, layerVisibility]);
+  }, [mapData, tileSize, playerPosition, worldPosition.x, worldPosition.y, agents, customTiles, loadedImages, layerVisibility]);
 
   return (
     <canvas

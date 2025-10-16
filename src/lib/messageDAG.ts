@@ -97,14 +97,13 @@ export class MessageDAGManager {
     const node = this.dag.nodes.get(messageId);
     if (!node) return [];
 
-    const thread: MessageNode[] = [];
     let current: MessageNode | undefined = node;
 
     // Trace back to root
     const pathToRoot: MessageNode[] = [];
     while (current) {
       pathToRoot.unshift(current);
-      current = current.parentIds.length > 0 ? 
+      current = current.parentIds.length > 0 ?
         this.dag.nodes.get(current.parentIds[0]) : undefined;
     }
 

@@ -133,7 +133,7 @@ export async function saveCustomTiles(userId: string, customTiles: TileLayers): 
 }
 
 // Get global tiles (for backward compatibility, still accepts userId but ignores it)
-export async function getCustomTiles(userId: string): Promise<CustomTilesData | null> {
+export async function getCustomTiles(_userId: string): Promise<CustomTilesData | null> {
   try {
     const redis = await getRedisClient();
     const globalTilesData = await redis.hGetAll('global-tiles');

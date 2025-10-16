@@ -41,9 +41,6 @@ export default function Home() {
   });
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [buildMode, setBuildMode] = useState<'select' | 'paint'>('select');
-  const [registeredImages, setRegisteredImages] = useState<{
-    [key: string]: string; // key: image name/id, value: image data URL
-  }>({});
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishStatus, setPublishStatus] = useState<{
     type: 'success' | 'error';
@@ -222,7 +219,6 @@ export default function Home() {
       setCustomTiles({ layer0: {}, layer1: {}, layer2: {} }); // Clear draft tiles since they're now published
       setSelectedImage(null);
       setBuildMode('select');
-      // Note: Don't clear registeredImages - they should persist
 
       // Clear status after 5 seconds
       setTimeout(() => {
@@ -458,8 +454,6 @@ export default function Home() {
             setSelectedImage={setSelectedImage}
             buildMode={buildMode}
             setBuildMode={setBuildMode}
-            registeredImages={registeredImages}
-            setRegisteredImages={setRegisteredImages}
             setCustomTiles={setCustomTiles}
             isPublishing={isPublishing}
             publishStatus={publishStatus}

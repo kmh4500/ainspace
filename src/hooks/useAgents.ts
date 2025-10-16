@@ -17,7 +17,7 @@ interface UseAgentsProps {
   viewRadius: number;
 }
 
-export function useAgents({ playerWorldPosition, mapWidth, mapHeight, viewRadius }: UseAgentsProps) {
+export function useAgents({ playerWorldPosition, mapWidth, mapHeight }: UseAgentsProps) {
   const { generateTileAt } = useMapData();
   
   const [agents, setAgents] = useState<AgentInternal[]>([

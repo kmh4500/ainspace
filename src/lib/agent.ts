@@ -158,7 +158,7 @@ export class ExplorerAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(message?: Message): boolean {
+  protected shouldRespondToMessage(_message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
   }
@@ -169,7 +169,7 @@ export class PatrolAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(message?: Message): boolean {
+  protected shouldRespondToMessage(_message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
   }
@@ -180,7 +180,7 @@ export class WandererAgent extends BaseAgent {
     super(initialState);
   }
 
-  protected shouldRespondToMessage(message?: Message): boolean {
+  protected shouldRespondToMessage(_message?: Message): boolean {
     // All agents are responsive - always respond to non-mentioned messages
     return true;
   }

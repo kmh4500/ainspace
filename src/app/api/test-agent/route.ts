@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Test fetching the agent card directly
     const testUrl = 'https://socratic-web3-ai-tutor.vercel.app/api/a2a/.well-known/agent.json';
-    
+
     console.log(`Testing direct fetch of: ${testUrl}`);
-    
+
     const response = await fetch(testUrl, {
       headers: {
         'Accept': 'application/json',
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     let data;
     try {
       data = JSON.parse(text);
-    } catch (e) {
+    } catch {
       data = { error: 'Failed to parse JSON', text: text.substring(0, 1000) };
     }
 
