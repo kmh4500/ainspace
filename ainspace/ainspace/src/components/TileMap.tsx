@@ -45,7 +45,7 @@ export default function TileMap({
   const [lastPaintedTile, setLastPaintedTile] = useState<{ x: number; y: number } | null>(null);
 
   // Check if customTiles is using layer structure
-  const isLayeredTiles = (tiles: any): tiles is TileLayers => {
+  const isLayeredTiles = (tiles: TileLayers | { [key: string]: string }): tiles is TileLayers => {
     return tiles && typeof tiles === 'object' && ('layer0' in tiles || 'layer1' in tiles || 'layer2' in tiles);
   };
 

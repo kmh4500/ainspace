@@ -14,9 +14,9 @@ export async function getRedisClient() {
       await client.connect();
     }
     return client;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If already connected, ignore the error and return client
-    if (error.message?.includes('Socket already opened') || error.message?.includes('already connected')) {
+    if (error instanceof Error && (error.message?.includes('Socket already opened') || error.message?.includes('already connected'))) {
       return client;
     }
     throw error;
