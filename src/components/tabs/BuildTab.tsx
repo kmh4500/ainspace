@@ -216,29 +216,12 @@ export default function BuildTab({
     img.src = tilesetImage;
   };
 
-  // Convert display coordinates to image pixel coordinates
-  const displayToImageCoords = (displayX: number, displayY: number) => {
-    if (!imgElementRef.current || !imageScale) return { x: displayX, y: displayY };
-    
-    const scaleX = imgElementRef.current.naturalWidth / imageScale.width;
-    const scaleY = imgElementRef.current.naturalHeight / imageScale.height;
-    
+  // Get scale ratio for coordinate conversion
+  const getScale = () => {
+    if (!imgElementRef.current || !imageScale) return { x: 1, y: 1 };
     return {
-      x: displayX * scaleX,
-      y: displayY * scaleY
-    };
-  };
-
-  // Convert image pixel coordinates to display coordinates
-  const imageToDisplayCoords = (imageX: number, imageY: number) => {
-    if (!imgElementRef.current || !imageScale) return { x: imageX, y: imageY };
-    
-    const scaleX = imageScale.width / imgElementRef.current.naturalWidth;
-    const scaleY = imageScale.height / imgElementRef.current.naturalHeight;
-    
-    return {
-      x: imageX * scaleX,
-      y: imageY * scaleY
+      x: imgElementRef.current.naturalWidth / imageScale.width,
+      y: imgElementRef.current.naturalHeight / imageScale.height
     };
   };
 
@@ -272,29 +255,32 @@ export default function BuildTab({
 
   const handleMouseUp = () => {
     if (!isDragging || !dragStart || !dragEnd) return;
-    
+
     // Convert display coordinates to image coordinates
-    const startImageCoords = displayToImageCoords(dragStart.x, dragStart.y);
-    const endImageCoords = displayToImageCoords(dragEnd.x, dragEnd.y);
-    
-    const minX = Math.min(startImageCoords.x, endImageCoords.x);
-    const minY = Math.min(startImageCoords.y, endImageCoords.y);
-    const maxX = Math.max(startImageCoords.x, endImageCoords.x);
-    const maxY = Math.max(startImageCoords.y, endImageCoords.y);
-    
-    // Snap to tile grid
+    const scale = getScale();
+    const startX = dragStart.x * scale.x;
+    const startY = dragStart.y * scale.y;
+    const endX = dragEnd.x * scale.x;
+    const endY = dragEnd.y * scale.y;
+
+    const minX = Math.min(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxX = Math.max(startX, endX);
+    const maxY = Math.max(startY, endY);
+
+    // Snap to tile grid in image coordinates
     const snappedX = Math.floor(minX / tileSize) * tileSize;
     const snappedY = Math.floor(minY / tileSize) * tileSize;
     const snappedWidth = Math.ceil((maxX - snappedX) / tileSize) * tileSize;
     const snappedHeight = Math.ceil((maxY - snappedY) / tileSize) * tileSize;
-    
+
     setSelection({
       x: snappedX,
       y: snappedY,
       width: snappedWidth,
       height: snappedHeight
     });
-    
+
     setIsDragging(false);
   };
 
@@ -305,12 +291,8 @@ export default function BuildTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tilesetImage, tileSize]);
 
-  useEffect(() => {
-    if (selection) {
-      extractSelectedTiles();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection]);
+  // Don't auto-extract tiles immediately - wait for user confirmation
+  // This is now triggered by a button click instead
 
   return (
     <BaseTabContent isActive={isActive} withPadding={false}>
@@ -458,44 +440,54 @@ export default function BuildTab({
                       />
                     )}
                     
-                    {/* Saved selection */}
-                    {selection && !isDragging && (
+                    {/* Saved selection - convert from image coords to display coords */}
+                    {selection && !isDragging && imageScale && imgElementRef.current && (
                       <div
                         className="absolute border-2 border-green-500 bg-green-200 opacity-30"
                         style={{
-                          left: imageToDisplayCoords(selection.x, selection.y).x,
-                          top: imageToDisplayCoords(selection.x, selection.y).y,
-                          width: (selection.width / (imgElementRef.current?.naturalWidth || 1)) * (imageScale?.width || selection.width),
-                          height: (selection.height / (imgElementRef.current?.naturalHeight || 1)) * (imageScale?.height || selection.height),
+                          left: (selection.x / imgElementRef.current.naturalWidth) * imageScale.width,
+                          top: (selection.y / imgElementRef.current.naturalHeight) * imageScale.height,
+                          width: (selection.width / imgElementRef.current.naturalWidth) * imageScale.width,
+                          height: (selection.height / imgElementRef.current.naturalHeight) * imageScale.height,
                           pointerEvents: 'none'
                         }}
                       />
                     )}
                     
-                    {/* Grid overlay */}
-                    <div 
+                    {/* Grid overlay - scale with image */}
+                    <div
                       className="absolute inset-0 pointer-events-none"
                       style={{
-                        backgroundImage: `repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 1px, transparent 1px, transparent ${tileSize}px), repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 1px, transparent 1px, transparent ${tileSize}px)`,
-                        backgroundSize: `${tileSize}px ${tileSize}px`
+                        backgroundImage: `repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 1px, transparent 1px, transparent ${imageScale ? (tileSize * imageScale.width / (imgElementRef.current?.naturalWidth || 1)) : tileSize}px), repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 1px, transparent 1px, transparent ${imageScale ? (tileSize * imageScale.width / (imgElementRef.current?.naturalWidth || 1)) : tileSize}px)`,
+                        backgroundSize: `${imageScale ? (tileSize * imageScale.width / (imgElementRef.current?.naturalWidth || 1)) : tileSize}px ${imageScale ? (tileSize * imageScale.height / (imgElementRef.current?.naturalHeight || 1)) : tileSize}px`
                       }}
                     />
                   </div>
                   
                   {selection && (
-                    <div className="mt-2 flex items-center justify-between">
+                    <div className="mt-2 space-y-2">
                       <p className="text-xs text-green-600">
                         Selected: {selection.width / tileSize} × {selection.height / tileSize} tiles
                       </p>
-                      <button
-                        onClick={() => {
-                          setSelection(null);
-                          setSelectedTiles(null);
-                        }}
-                        className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300 transition-colors"
-                      >
-                        Clear Selection
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => {
+                            extractSelectedTiles();
+                          }}
+                          className="flex-1 px-3 py-2 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors"
+                        >
+                          ✂️ Extract Tiles ({(selection.width / tileSize) * (selection.height / tileSize)} tiles)
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelection(null);
+                            setSelectedTiles(null);
+                          }}
+                          className="px-3 py-2 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300 transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
