@@ -5,6 +5,7 @@ import BaseTabContent from './BaseTabContent';
 interface ImportedAgent {
   url: string;
   card: AgentCard;
+  characterImage?: string; // Character image URL for layer2
 }
 
 interface AgentTabProps {
@@ -12,18 +13,21 @@ interface AgentTabProps {
   onSpawnAgent: (agent: ImportedAgent) => void;
   onRemoveAgentFromMap: (agentUrl: string) => void;
   spawnedAgents: string[]; // URLs of spawned agents
+  onUploadCharacterImage: (agentUrl: string, imageUrl: string) => void;
 }
 
-export default function AgentTab({ 
-  isActive, 
-  onSpawnAgent, 
+export default function AgentTab({
+  isActive,
+  onSpawnAgent,
   onRemoveAgentFromMap,
-  spawnedAgents 
+  spawnedAgents,
+  onUploadCharacterImage
 }: AgentTabProps) {
   const [agentUrl, setAgentUrl] = useState('');
   const [agents, setAgents] = useState<ImportedAgent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
 
   const handleImportAgent = async () => {
     if (!agentUrl.trim()) {
@@ -76,6 +80,43 @@ export default function AgentTab({
 
   const handleRemoveAgent = (url: string) => {
     setAgents(agents.filter(agent => agent.url !== url));
+  };
+
+  const handleImageUpload = async (agentUrl: string, file: File) => {
+    setUploadingImage(agentUrl);
+    try {
+      // Upload to Vercel Blob
+      const formData = new FormData();
+      const imageId = `character_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      formData.append('file', file, `${imageId}.png`);
+      formData.append('tileId', imageId);
+
+      const uploadResponse = await fetch('/api/upload-tile', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload image');
+      }
+
+      const { url } = await uploadResponse.json();
+
+      // Update agent with character image
+      setAgents(agents.map(agent =>
+        agent.url === agentUrl
+          ? { ...agent, characterImage: url }
+          : agent
+      ));
+
+      // Notify parent component
+      onUploadCharacterImage(agentUrl, url);
+
+    } catch (err) {
+      setError(`Failed to upload image: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setUploadingImage(null);
+    }
   };
 
   return (
@@ -164,32 +205,76 @@ export default function AgentTab({
                       )}
                     </div>
                     
-                    <div className="ml-4 flex space-x-2">
-                      {spawnedAgents.includes(agent.url) ? (
+                    <div className="ml-4 flex flex-col space-y-2">
+                      <div className="flex space-x-2">
+                        {spawnedAgents.includes(agent.url) ? (
+                          <button
+                            onClick={() => onRemoveAgentFromMap(agent.url)}
+                            className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
+                            title="Remove from map"
+                          >
+                            Remove from Map
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onSpawnAgent(agent)}
+                            className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
+                            title="Spawn on map"
+                          >
+                            Spawn on Map
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => onRemoveAgentFromMap(agent.url)}
-                          className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors"
-                          title="Remove from map"
+                          onClick={() => handleRemoveAgent(agent.url)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                          title="Remove agent completely"
                         >
-                          Remove from Map
+                          ✕
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => onSpawnAgent(agent)}
-                          className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors"
-                          title="Spawn on map"
-                        >
-                          Spawn on Map
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => handleRemoveAgent(agent.url)}
-                        className="text-red-500 hover:text-red-700 transition-colors"
-                        title="Remove agent completely"
-                      >
-                        ✕
-                      </button>
+                      </div>
+
+                      {/* Character Image Upload */}
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-xs text-gray-600">Character Image:</label>
+                        {agent.characterImage ? (
+                          <div className="flex items-center space-x-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={agent.characterImage}
+                              alt="Character"
+                              className="w-8 h-8 border rounded object-cover"
+                            />
+                            <label className="cursor-pointer px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                              Change
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleImageUpload(agent.url, file);
+                                }}
+                                disabled={uploadingImage === agent.url}
+                              />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="cursor-pointer px-2 py-1 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 transition-colors text-center">
+                            {uploadingImage === agent.url ? 'Uploading...' : 'Upload Image'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageUpload(agent.url, file);
+                              }}
+                              disabled={uploadingImage === agent.url}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

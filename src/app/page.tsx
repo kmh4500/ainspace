@@ -62,6 +62,7 @@ export default function Home() {
       color: string;
       agentUrl: string;
       lastMoved: number;
+      characterImage?: string;
     };
   }>({});
 
@@ -242,11 +243,11 @@ export default function Home() {
   };
 
   // A2A Agent handlers - now integrated into worldAgents
-  const handleSpawnAgent = (importedAgent: { url: string; card: { name?: string } }) => {
+  const handleSpawnAgent = (importedAgent: { url: string; card: { name?: string }; characterImage?: string }) => {
     const agentId = `a2a-${Date.now()}`;
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
-    
+
     // Spawn near player position
     const spawnX = worldPosition.x + Math.floor(Math.random() * 6) - 3;
     const spawnY = worldPosition.y + Math.floor(Math.random() * 6) - 3;
@@ -261,9 +262,47 @@ export default function Home() {
         y: spawnY,
         color: randomColor,
         agentUrl: importedAgent.url,
-        lastMoved: Date.now()
+        lastMoved: Date.now(),
+        characterImage: importedAgent.characterImage
       }
     }));
+
+    // If there's a character image, place it on layer2
+    if (importedAgent.characterImage) {
+      const charImage = importedAgent.characterImage;
+      setCustomTiles(prev => ({
+        ...prev,
+        layer2: {
+          ...prev.layer2,
+          [`${spawnX},${spawnY}`]: charImage
+        }
+      }));
+    }
+  };
+
+  const handleUploadCharacterImage = (agentUrl: string, imageUrl: string) => {
+    // Update the spawned agent's character image
+    setSpawnedA2AAgents(prev => {
+      const agent = prev[agentUrl];
+      if (!agent) return prev;
+
+      // Place character image on layer2 at agent's current position
+      setCustomTiles(prevTiles => ({
+        ...prevTiles,
+        layer2: {
+          ...prevTiles.layer2,
+          [`${agent.x},${agent.y}`]: imageUrl
+        }
+      }));
+
+      return {
+        ...prev,
+        [agentUrl]: {
+          ...agent,
+          characterImage: imageUrl
+        }
+      };
+    });
   };
 
   const handleRemoveAgentFromMap = (agentUrl: string) => {
@@ -293,7 +332,7 @@ export default function Home() {
     .map(agent => {
       const screenX = agent.x - worldPosition.x + Math.floor(mapData[0]?.length / 2);
       const screenY = agent.y - worldPosition.y + Math.floor(mapData.length / 2);
-      
+
       // Only show if within visible area
       if (screenX >= 0 && screenX < mapData[0]?.length && screenY >= 0 && screenY < mapData.length) {
         return {
@@ -301,7 +340,8 @@ export default function Home() {
           screenX,
           screenY,
           color: agent.color,
-          name: agent.name
+          name: agent.name,
+          hasCharacterImage: !!agent.characterImage
         };
       }
       return null;
@@ -312,6 +352,7 @@ export default function Home() {
       screenY: number;
       color: string;
       name: string;
+      hasCharacterImage?: boolean;
     }>;
 
   const combinedVisibleAgents = [...visibleAgents, ...a2aVisibleAgents];
@@ -322,7 +363,7 @@ export default function Home() {
       setSpawnedA2AAgents(prev => {
         const now = Date.now();
         const updated = { ...prev };
-        
+
         Object.values(updated).forEach(agent => {
           // Move agents every 5-10 seconds randomly
           if (now - agent.lastMoved > 5000 + Math.random() * 5000) {
@@ -332,18 +373,36 @@ export default function Home() {
               { dx: -1, dy: 0 }, // left
               { dx: 1, dy: 0 },  // right
             ];
-            
+
             const direction = directions[Math.floor(Math.random() * directions.length)];
+            const oldX = agent.x;
+            const oldY = agent.y;
             const newX = agent.x + direction.dx;
             const newY = agent.y + direction.dy;
-            
+
+            // Update character image position on layer2 if it exists
+            if (agent.characterImage) {
+              setCustomTiles(prevTiles => {
+                const newLayer2 = { ...prevTiles.layer2 };
+                // Remove from old position
+                delete newLayer2[`${oldX},${oldY}`];
+                // Add to new position
+                newLayer2[`${newX},${newY}`] = agent.characterImage!;
+
+                return {
+                  ...prevTiles,
+                  layer2: newLayer2
+                };
+              });
+            }
+
             // Simple boundary check (agents can move anywhere)
             agent.x = newX;
             agent.y = newY;
             agent.lastMoved = now;
           }
         });
-        
+
         return updated;
       });
     };
@@ -466,6 +525,7 @@ export default function Home() {
             onSpawnAgent={handleSpawnAgent}
             onRemoveAgentFromMap={handleRemoveAgentFromMap}
             spawnedAgents={Object.keys(spawnedA2AAgents)}
+            onUploadCharacterImage={handleUploadCharacterImage}
           />
         </div>
       </div>

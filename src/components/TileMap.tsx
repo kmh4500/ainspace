@@ -8,6 +8,7 @@ interface Agent {
   screenY: number;
   color: string;
   name: string;
+  hasCharacterImage?: boolean;
 }
 
 type TileLayers = {
@@ -249,8 +250,11 @@ export default function TileMap({
       }
     }
 
-    // Draw agents
+    // Draw agents (only if they don't have character images)
     agents.forEach(agent => {
+      // Skip drawing square if agent has a character image
+      if (agent.hasCharacterImage) return;
+
       ctx.fillStyle = agent.color;
       ctx.fillRect(
         agent.screenX * tileSize + 4,
@@ -258,7 +262,7 @@ export default function TileMap({
         tileSize - 8,
         tileSize - 8
       );
-      
+
       // Draw agent border
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 1;
