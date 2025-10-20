@@ -25,10 +25,12 @@ export async function POST(request: NextRequest) {
     
     // Prepare message payload using A2A SDK format
     const userMessage: Message = {
-      kind: "message",
+      kind: 'message',
       messageId: uuidv4(),
-      role: "user",
-      parts: [{ kind: "text", text: message }],
+      role: 'user',
+      parts: [{ kind: 'text', text: message }],
+      // FIXME(yoojin): ain adk a2a needs agentId and type. User Id (address) can be used as agentId.
+      metadata: { agentId: '123', type: 'CHAT' }
     };
 
     // Add contextId if provided for continuing conversations (중요: 유지된 contextId 사용)
@@ -58,8 +60,14 @@ export async function POST(request: NextRequest) {
     if (response && typeof response === 'object') {
       // JSON-RPC format: response.result IS the message
       if ('result' in response && response.result && typeof response.result === 'object' && 'kind' in response.result) {
-        responseMessage = response.result;
         console.log('Found response in result (JSON-RPC format)');
+        const { result } = response;
+        if ('status' in result && 'message' in result.status) {
+          // ain-adk response
+          responseMessage = result.status.message;
+        } else {
+          responseMessage = result;
+        }
       } else if ('result' in response && response.result && typeof response.result === 'object' && 'message' in response.result) {
         responseMessage = response.result.message;
         console.log('Found response in result.message');
