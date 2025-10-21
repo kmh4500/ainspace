@@ -1,4 +1,5 @@
 // Removed direct gemini import to ensure server-side only calls
+import { AgentSkill } from '@a2a-js/sdk';
 
 export interface AgentState {
   id: string;
@@ -10,7 +11,9 @@ export interface AgentState {
   direction?: 'up' | 'down' | 'left' | 'right';
   lastMoved?: number;
   moveInterval?: number;
-  agentUrl?: string; // For A2A agents
+  // For A2A agents
+  agentUrl?: string;
+  skills?: AgentSkill[];
 }
 
 export interface Message {
@@ -73,13 +76,18 @@ export abstract class BaseAgent {
   }
 
   // Process incoming message and generate response if appropriate
-  async processMessage(message: Message, totalDelay: number): Promise<AgentResponse | null> {
+  async processMessage(message: Message, totalDelay: number, metadata?: { [key: string]: unknown }): Promise<AgentResponse | null> {
     console.log(`Agent ${this.name} processing message:`, {
       threadId: message.threadId,
+      metadata: metadata,
       isMentioned: message.isMentioned,
       isInThread: message.threadId ? this.isInThread(message.threadId) : 'N/A',
       activeThreads: Array.from(this.activeThreads)
     });
+
+    if (metadata?.agentSkills) {
+      metadata.agentSkills = (metadata.agentSkills as AgentSkill[]).filter(agent => agent.name !== this.name);
+    }
 
     // Check thread participation
     if (message.threadId) {
@@ -208,7 +216,7 @@ export class A2AAgent extends BaseAgent {
     return;
   }
 
-  async processMessage(message: Message): Promise<AgentResponse | null> {
+  async processMessage(message: Message, totalDelay: number, metadata?: { [key: string]: unknown }): Promise<AgentResponse | null> {
     if (!this.shouldRespondToMessage(message)) {
       return null;
     }
@@ -224,6 +232,7 @@ export class A2AAgent extends BaseAgent {
       const requestBody = {
         agentUrl: this.agentUrl,
         message: `[From player at (${message.playerPosition.x}, ${message.playerPosition.y})]: ${message.content}`,
+        metadata: metadata,
       };
       
       console.log(`Sending to agent-chat API:`, requestBody);

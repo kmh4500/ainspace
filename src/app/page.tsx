@@ -7,6 +7,8 @@ import MapTab from '@/components/tabs/MapTab';
 import ThreadTab from '@/components/tabs/ThreadTab';
 import BuildTab from '@/components/tabs/BuildTab';
 import AgentTab from '@/components/tabs/AgentTab';
+import { AgentCard } from '@a2a-js/sdk';
+import { AgentState } from '@/lib/agent';
 
 export default function Home() {
   const { playerPosition, mapData, worldPosition, movePlayer, isLoading, userId, visibleAgents, worldAgents, isAutonomous, toggleAutonomous, lastCommentary } = useGameState();
@@ -54,15 +56,7 @@ export default function Home() {
 
   // A2A Agent management state
   const [spawnedA2AAgents, setSpawnedA2AAgents] = useState<{
-    [agentUrl: string]: {
-      id: string;
-      name: string;
-      x: number;
-      y: number;
-      color: string;
-      agentUrl: string;
-      lastMoved: number;
-    };
+    [agentUrl: string]: AgentState
   }>({});
 
   // Load custom tiles when userId is available
@@ -242,7 +236,7 @@ export default function Home() {
   };
 
   // A2A Agent handlers - now integrated into worldAgents
-  const handleSpawnAgent = (importedAgent: { url: string; card: { name?: string } }) => {
+  const handleSpawnAgent = (importedAgent: { url: string; card: AgentCard }) => {
     const agentId = `a2a-${Date.now()}`;
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -261,7 +255,9 @@ export default function Home() {
         y: spawnY,
         color: randomColor,
         agentUrl: importedAgent.url,
-        lastMoved: Date.now()
+        behavior: 'A2A Agent',
+        lastMoved: Date.now(),
+        skills: importedAgent.card.skills || []
       }
     }));
   };
@@ -284,7 +280,8 @@ export default function Home() {
       color: agent.color,
       name: agent.name,
       behavior: 'A2A Agent',
-      agentUrl: agent.agentUrl // Include agentUrl for A2A agents
+      agentUrl: agent.agentUrl, // Include agentUrl for A2A agents
+      skills: agent.skills
     }))
   ];
 
@@ -325,7 +322,7 @@ export default function Home() {
         
         Object.values(updated).forEach(agent => {
           // Move agents every 5-10 seconds randomly
-          if (now - agent.lastMoved > 5000 + Math.random() * 5000) {
+          if (agent.lastMoved && now - agent.lastMoved > 5000 + Math.random() * 5000) {
             const directions = [
               { dx: 0, dy: -1 }, // up
               { dx: 0, dy: 1 },  // down

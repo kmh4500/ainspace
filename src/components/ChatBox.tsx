@@ -55,13 +55,14 @@ const ChatBox = forwardRef<ChatBoxRef, ChatBoxProps>(function ChatBox({ classNam
     agents: agents || [],
     playerPosition: playerWorldPosition || { x: 0, y: 0 },
     onAgentResponse: (response: AgentResponse & { threadId?: string }) => {
+      const { agentId, message, threadId } = response;
       // Add agent response to chat with thread ID
       const agentMessage: Message = {
-        id: `agent-${response.agentId}-${Date.now()}`,
-        text: response.message,
+        id: `agent-${agentId}-${Date.now()}`,
+        text: message,
         timestamp: new Date(),
         sender: 'ai',
-        threadId: response.threadId || currentThreadId || undefined
+        threadId: threadId || currentThreadId || undefined
       };
       
       console.log('Agent response received:', {
